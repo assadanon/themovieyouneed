@@ -582,15 +582,12 @@ section { position: relative; z-index: 1; }
   flex-shrink: 0;
 }
 
-.mag-card-big .mag-poster { height: 360px; }
-.mag-card:not(.mag-card-big) .mag-poster { height: 180px; }
+.mag-poster { aspect-ratio: 2 / 3; }
 
 .mag-poster img {
   width: 100%; height: 100%;
-  object-fit: cover; display: block;
-  transition: transform 0.35s ease;
+  object-fit: contain; display: block;
 }
-.mag-card:hover .mag-poster img { transform: scale(1.03); }
 
 .poster-placeholder {
   width: 100%; height: 100%;
