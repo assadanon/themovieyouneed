@@ -456,31 +456,15 @@ function renderResults({ profile, recommendations }) {
   // Sort by fit_percentage descending — highest match first
   const sorted = [...recommendations].sort((a, b) => b.fit_percentage - a.fit_percentage);
 
-  // Row 1: highest match — solo
-  if (sorted[0]) {
-    const row1 = document.createElement('div');
-    row1.className = 'cards-row cards-row-single';
-    row1.appendChild(createMovieCard(sorted[0]));
-    recommendationsEl.appendChild(row1);
-  }
-
-  // Row 2: 2nd + 3rd
-  const row2 = document.createElement('div');
-  row2.className = 'cards-row';
-  if (sorted[1]) row2.appendChild(createMovieCard(sorted[1]));
-  if (sorted[2]) row2.appendChild(createMovieCard(sorted[2]));
-  if (row2.children.length) recommendationsEl.appendChild(row2);
-
-  // Row 3: 4th + 5th
-  const row3 = document.createElement('div');
-  row3.className = 'cards-row';
-  if (sorted[3]) row3.appendChild(createMovieCard(sorted[3]));
-  if (sorted[4]) row3.appendChild(createMovieCard(sorted[4]));
-  if (row3.children.length) recommendationsEl.appendChild(row3);
+  // Magazine grid: big card (highest %) + 4 smaller cards
+  const grid = document.createElement('div');
+  grid.className = 'magazine-grid';
+  sorted.forEach((rec, i) => grid.appendChild(createMovieCard(rec, i === 0)));
+  recommendationsEl.appendChild(grid);
 
   // Staggered reveal
-  recommendationsEl.querySelectorAll('.movie-card').forEach((card, i) => {
-    setTimeout(() => card.classList.add('revealed'), i * 130);
+  recommendationsEl.querySelectorAll('.mag-card').forEach((card, i) => {
+    setTimeout(() => card.classList.add('revealed'), i * 120);
   });
 
   // Our choice — the recommendation with the highest fit_percentage
@@ -498,15 +482,17 @@ function renderResults({ profile, recommendations }) {
   }, 200);
 }
 
-function createMovieCard(movie) {
+function createMovieCard(movie, isBig = false) {
   const cat  = CATEGORIES[movie.category] || {};
   const card = document.createElement('div');
-  card.className = 'movie-card';
+  card.className = isBig ? 'mag-card mag-card-big' : 'mag-card';
   card.style.setProperty('--cat-color', cat.color || 'var(--bg3)');
+
   if (movie.tmdb_id) {
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', () => {
-      window.open(`https://www.themoviedb.org/movie/${movie.tmdb_id}`, '_blank', 'noopener');
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('.show-more-btn')) {
+        window.open(`https://www.themoviedb.org/movie/${movie.tmdb_id}`, '_blank', 'noopener');
+      }
     });
   }
 
@@ -514,31 +500,28 @@ function createMovieCard(movie) {
     ? `<img src="${movie.poster}" alt="${escapeHtml(movie.title)}" loading="lazy">`
     : `<div class="poster-placeholder">🎬</div>`;
 
-  const actorsText = movie.actors?.length
-    ? `<span class="crew-label">with</span> ${escapeHtml(movie.actors.join(', '))}`
-    : '';
-
-  const synopsisHTML = movie.synopsis
-    ? `<p class="movie-synopsis">${escapeHtml(movie.synopsis)}</p>`
-    : '';
+  const synopsis = movie.synopsis || '';
+  const crewText = `<span class="crew-label">dir.</span> ${escapeHtml(movie.director || '')}`;
 
   card.innerHTML = `
-    <div class="movie-poster">${posterHTML}</div>
-    <div class="movie-info">
+    <div class="mag-poster">${posterHTML}</div>
+    <div class="mag-body">
       <div class="category-label">${escapeHtml(cat.label || movie.category)}</div>
-      <div class="movie-meta-top">
-        <span class="fit-badge">${movie.fit_percentage}% resonance</span>
-      </div>
-      <div class="movie-title">
-        ${escapeHtml(movie.title)}<span class="movie-year">(${escapeHtml(String(movie.year))})</span>
-      </div>
-      <div class="movie-crew">
-        <span class="crew-label">dir.</span> ${escapeHtml(movie.director)}
-        ${actorsText ? ' · ' + actorsText : ''}
-      </div>
-      ${synopsisHTML}
+      <div class="movie-title">${escapeHtml(movie.title)}<span class="movie-year">(${movie.year})</span></div>
+      <div class="movie-crew">${crewText}</div>
+      ${synopsis ? `<p class="movie-synopsis">${escapeHtml(synopsis)}</p><button class="show-more-btn">+ show more</button>` : ''}
+      <span class="fit-badge">${movie.fit_percentage}% resonance</span>
     </div>
   `;
+
+  if (synopsis) {
+    const btn = card.querySelector('.show-more-btn');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const expanded = card.classList.toggle('synopsis-expanded');
+      btn.textContent = expanded ? '− show less' : '+ show more';
+    });
+  }
 
   return card;
 }

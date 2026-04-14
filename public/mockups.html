@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout Mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #020b16; color: #c8dde8; font-family: 'DM Sans', sans-serif; padding: 40px 24px; }
+
+.option { max-width: 900px; margin: 0 auto 80px; }
+.option-label { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: #00e5a0; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+.option-desc { font-size: 0.82rem; color: #5a7a95; margin-bottom: 28px; letter-spacing: 0.02em; }
+.rx-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: #00e5a0; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 24px; }
+
+/* Shared poster placeholder */
+.poster { background: #0d2035; border-radius: 6px; overflow: hidden; position: relative; }
+.poster img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.85; }
+.cat-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* ── A: Poster Grid ── */
+.grid-6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.grid-cell { position: relative; cursor: pointer; }
+.grid-cell .poster { aspect-ratio: 2/3; }
+.grid-cell .overlay {
+  position: absolute; inset: 0; border-radius: 6px;
+  background: linear-gradient(to top, rgba(2,11,22,0.96) 0%, rgba(2,11,22,0.3) 50%, transparent 100%);
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 14px;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.grid-cell:hover .overlay { opacity: 1; }
+.grid-cell .cat-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 5px; }
+.grid-cell .mov-title { font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 700; color: #eef6fc; line-height: 1.3; margin-bottom: 4px; }
+.grid-cell .why-line { font-size: 0.68rem; color: #8aa8be; line-height: 1.4; }
+.grid-cell .fit { font-size: 0.62rem; color: #5a7a95; margin-top: 6px; }
+/* always-visible label strip at top */
+.grid-cell .top-label {
+  position: absolute; top: 0; left: 0; right: 0; padding: 10px 12px;
+  background: linear-gradient(to bottom, rgba(2,11,22,0.75), transparent);
+  font-size: 0.58rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  border-radius: 6px 6px 0 0;
+}
+
+/* ── B: Carousel ── */
+.carousel { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: thin; scrollbar-color: #102540 transparent; }
+.carousel::-webkit-scrollbar { height: 4px; }
+.carousel::-webkit-scrollbar-track { background: transparent; }
+.carousel::-webkit-scrollbar-thumb { background: #102540; border-radius: 2px; }
+.carousel-card { flex: 0 0 170px; cursor: pointer; position: relative; }
+.carousel-card .poster { height: 255px; border: 1px solid #102540; }
+.carousel-card .card-foot { padding: 10px 4px 0; }
+.carousel-card .cat-label { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 4px; }
+.carousel-card .mov-title { font-family: 'Playfair Display', serif; font-size: 0.82rem; color: #eef6fc; line-height: 1.3; }
+.carousel-card .fit-badge { display: inline-block; margin-top: 6px; font-size: 0.6rem; color: #5a7a95; background: #0b1d31; padding: 2px 7px; border-radius: 10px; }
+/* expanded state preview */
+.carousel-card.expanded .poster { border-color: var(--cc); box-shadow: 0 0 0 1px var(--cc); }
+.expand-panel { background: #0b1d31; border-radius: 0 0 8px 8px; padding: 12px; margin-top: -4px; border: 1px solid #102540; border-top: none; font-size: 0.72rem; color: #8aa8be; line-height: 1.55; display: none; }
+.carousel-card.expanded .expand-panel { display: block; }
+
+/* ── C: Magazine ── */
+.magazine { display: grid; grid-template-columns: 1.6fr 1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
+.mag-card { background: #0b1d31; border-radius: 10px; overflow: hidden; cursor: pointer; border: 1px solid #102540; }
+.mag-card.big { grid-row: 1 / 3; display: flex; flex-direction: column; }
+.mag-card.big .poster { flex: 1; min-height: 320px; }
+.mag-card:not(.big) .poster { height: 160px; }
+.mag-card .card-body { padding: 14px; }
+.mag-card .cat-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px; }
+.mag-card .mov-title { font-family: 'Playfair Display', serif; font-size: 1rem; color: #eef6fc; line-height: 1.35; margin-bottom: 6px; }
+.mag-card:not(.big) .mov-title { font-size: 0.85rem; }
+.mag-card .meta { font-size: 0.68rem; color: #5a7a95; }
+.mag-card .synopsis { font-size: 0.72rem; color: #8aa8be; line-height: 1.5; margin-top: 8px; }
+.show-more { font-size: 0.65rem; color: #00e5a0; margin-top: 6px; cursor: pointer; opacity: 0.8; }
+.mag-card .fit-badge { display: inline-block; margin-top: 8px; font-size: 0.62rem; color: #00e5a0; background: rgba(0,229,160,0.08); padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(0,229,160,0.2); }
+
+/* ── D: Filmstrip ── */
+.filmstrip-wrap { background: #040d1a; border-radius: 12px; padding: 20px 24px; border: 1px solid #0d2035; overflow: hidden; }
+.sprockets { display: flex; justify-content: space-between; padding: 0 8px; margin-bottom: 8px; }
+.sprocket { width: 18px; height: 12px; background: #020b16; border-radius: 3px; border: 1px solid #0d2035; }
+.film-row { display: flex; gap: 10px; }
+.film-cell { flex: 1; cursor: pointer; }
+.film-cell .poster { aspect-ratio: 2/3; border: 2px solid #0d2035; }
+.film-cell .film-info { padding: 10px 2px 0; text-align: center; }
+.film-cell .cat-label { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 4px; }
+.film-cell .mov-title { font-family: 'Playfair Display', serif; font-size: 0.72rem; color: #eef6fc; line-height: 1.3; }
+.film-detail { background: #0b1d31; border-radius: 8px; margin-top: 16px; padding: 16px 20px; border: 1px solid #102540; display: flex; gap: 16px; }
+.film-detail .det-poster { width: 60px; height: 90px; flex-shrink: 0; border-radius: 4px; overflow: hidden; }
+.film-detail .det-poster img { width: 100%; height: 100%; object-fit: cover; }
+.film-detail .det-body { flex: 1; }
+.film-detail .det-title { font-family: 'Playfair Display', serif; font-size: 1rem; color: #eef6fc; margin-bottom: 4px; }
+.film-detail .det-meta { font-size: 0.7rem; color: #5a7a95; margin-bottom: 8px; }
+.film-detail .det-why { font-size: 0.75rem; color: #8aa8be; line-height: 1.55; }
+
+/* ── E: Rx Pad ── */
+.rx-pad { background: #f5f0e8; border-radius: 12px; padding: 28px 32px; max-width: 560px; position: relative; box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
+.rx-pad::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: repeating-linear-gradient(90deg, #c8a96e 0px, #c8a96e 20px, #b89558 20px, #b89558 21px); border-radius: 12px 12px 0 0; }
+.rx-pad-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #d4c9b0; }
+.rx-pad-logo { font-family: 'Playfair Display', serif; font-size: 0.75rem; font-style: italic; color: #8a7a5a; }
+.rx-pad-logo strong { display: block; font-size: 1rem; font-style: normal; font-weight: 700; color: #3a2e1a; }
+.rx-symbol { font-family: 'Playfair Display', serif; font-size: 2.8rem; color: #c8a96e; line-height: 1; font-weight: 700; }
+.rx-line { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; border-bottom: 1px solid #e8e0ce; cursor: pointer; }
+.rx-line:last-of-type { border-bottom: none; }
+.rx-checkbox { width: 16px; height: 16px; border: 1.5px solid #c8a96e; border-radius: 3px; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; }
+.rx-check { width: 10px; height: 10px; background: #c8a96e; border-radius: 1px; display: none; }
+.rx-thumb { width: 36px; height: 54px; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.rx-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.rx-info { flex: 1; }
+.rx-cat { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9a7a3a; margin-bottom: 3px; }
+.rx-title { font-family: 'Playfair Display', serif; font-size: 0.95rem; color: #1a1208; line-height: 1.3; }
+.rx-dose { font-size: 0.65rem; color: #7a6a4a; margin-top: 2px; }
+.rx-sig { margin-top: 20px; padding-top: 14px; border-top: 1px solid #d4c9b0; font-size: 0.65rem; color: #9a8a6a; font-style: italic; }
+
+/* ── sample data ── */
+</style>
+</head>
+<body>
+
+<!-- OPTION A -->
+<div class="option">
+  <div class="option-label">A — Poster Grid</div>
+  <div class="option-desc">Hover any poster to reveal the details. No hierarchy — all 5 equal.</div>
+  <div class="rx-title">YOUR PRESCRIPTION:</div>
+  <div class="grid-6">
+    <div class="grid-cell">
+      <div class="poster" style="aspect-ratio:2/3; background: linear-gradient(135deg,#1a3a2a,#0d2035)">
+        <img src="https://image.tmdb.org/t/p/w342/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="">
+      </div>
+      <div class="top-label" style="color:#f4a7b9">The Popular Choice</div>
+      <div class="overlay">
+        <div class="cat-label" style="color:#f4a7b9">The Popular Choice</div>
+        <div class="mov-title">The Shawshank Redemption</div>
+        <div class="why-line">Andy's refusal to surrender mirrors your need to believe in something beyond the walls.</div>
+        <div class="fit">94% resonance</div>
+      </div>
+    </div>
+    <div class="grid-cell">
+      <div class="poster" style="aspect-ratio:2/3; background: linear-gradient(135deg,#1a2a3a,#0d2035)">
+        <img src="https://image.tmdb.org/t/p/w342/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg" alt="">
+      </div>
+      <div class="top-label" style="color:#7ecba8">The Animated One</div>
+      <div class="overlay">
+        <div class="cat-label" style="color:#7ecba8">The Animated One</div>
+        <div class="mov-title">Spirited Away</div>
+        <div class="why-line">Chihiro's courage in an alien world echoes your longing to find yourself again.</div>
+        <div class="fit">91% resonance</div>
+      </div>
+    </div>
+    <div class="grid-cell">
+      <div class="poster" style="aspect-ratio:2/3; background: linear-gradient(135deg,#2a1a3a,#0d2035)">
+        <img src="https://image.tmdb.org/t/p/w342/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg" alt="">
+      </div>
+      <div class="top-label" style="color:#ce93d8">The World Cinema One</div>
+      <div class="overlay">
+        <div class="cat-label" style="color:#ce93d8">The World Cinema One</div>
+        <div class="mov-title">Parasite</div>
+        <div class="why-line">The Kim family's yearning to be seen mirrors your need for validation.</div>
+        <div class="fit">88% resonance</div>
+      </div>
+    </div>
+    <div class="grid-cell">
+      <div class="poster" style="aspect-ratio:2/3; background: linear-gradient(135deg,#1a2a2a,#0d2035)">
+        <img src="https://image.tmdb.org/t/p/w342/9rCMpXSJeQfOi0gS3HjDPXFnaaH.jpg" alt="">
+      </div>
+      <div class="top-label" style="color:#4dd0e1">The Hidden Gem</div>
+      <div class="overlay">
+        <div class="cat-label" style="color:#4dd0e1">The Hidden Gem</div>
+        <div class="mov-title">Adaptation</div>
+        <div class="why-line">Charlie's spiral into self-doubt mirrors your search for clarity.</div>
+        <div class="fit">81% resonance</div>
+      </div>
+    </div>
+    <div class="grid-cell">
+      <div class="poster" style="aspect-ratio:2/3; background: linear-gradient(135deg,#2a2a1a,#0d2035)">
+        <img src="https://image.tmdb.org/t/p/w342/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg" alt="">
+      </div>
+      <div class="top-label" style="color:#c9d4db">The Hall of Fame Choice</div>
+      <div class="overlay">
+        <div class="cat-label" style="color:#c9d4db">The Hall of Fame Choice</div>
+        <div class="mov-title">Casablanca</div>
+        <div class="why-line">Rick's buried tenderness resurfaces — as yours is ready to.</div>
+        <div class="fit">76% resonance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION B -->
+<div class="option">
+  <div class="option-label">B — Carousel</div>
+  <div class="option-desc">Scroll horizontally. Click a card to expand details below it.</div>
+  <div class="rx-title">YOUR PRESCRIPTION:</div>
+  <div class="carousel">
+    <div class="carousel-card expanded" style="--cc:#f4a7b9">
+      <div class="poster" style="height:255px; border:1px solid #f4a7b9; box-shadow:0 0 0 1px #f4a7b9; border-radius:6px">
+        <img src="https://image.tmdb.org/t/p/w342/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:5px">
+      </div>
+      <div class="card-foot">
+        <div class="cat-label" style="color:#f4a7b9">The Popular Choice</div>
+        <div class="mov-title">The Shawshank Redemption</div>
+        <div class="fit-badge">94% resonance</div>
+      </div>
+      <div class="expand-panel" style="display:block; border-color:#f4a7b9; border-top:none">
+        Andy's refusal to surrender mirrors your need to believe in something beyond the walls.
+      </div>
+    </div>
+    <div class="carousel-card" style="--cc:#7ecba8">
+      <div class="poster" style="height:255px; border:1px solid #102540; border-radius:6px">
+        <img src="https://image.tmdb.org/t/p/w342/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:5px">
+      </div>
+      <div class="card-foot">
+        <div class="cat-label" style="color:#7ecba8">The Animated One</div>
+        <div class="mov-title">Spirited Away</div>
+        <div class="fit-badge">91% resonance</div>
+      </div>
+    </div>
+    <div class="carousel-card" style="--cc:#ce93d8">
+      <div class="poster" style="height:255px; border:1px solid #102540; border-radius:6px">
+        <img src="https://image.tmdb.org/t/p/w342/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:5px">
+      </div>
+      <div class="card-foot">
+        <div class="cat-label" style="color:#ce93d8">The World Cinema One</div>
+        <div class="mov-title">Parasite</div>
+        <div class="fit-badge">88% resonance</div>
+      </div>
+    </div>
+    <div class="carousel-card" style="--cc:#4dd0e1">
+      <div class="poster" style="height:255px; border:1px solid #102540; border-radius:6px">
+        <img src="https://image.tmdb.org/t/p/w342/9rCMpXSJeQfOi0gS3HjDPXFnaaH.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:5px">
+      </div>
+      <div class="card-foot">
+        <div class="cat-label" style="color:#4dd0e1">The Hidden Gem</div>
+        <div class="mov-title">Adaptation</div>
+        <div class="fit-badge">81% resonance</div>
+      </div>
+    </div>
+    <div class="carousel-card" style="--cc:#c9d4db">
+      <div class="poster" style="height:255px; border:1px solid #102540; border-radius:6px">
+        <img src="https://image.tmdb.org/t/p/w342/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:5px">
+      </div>
+      <div class="card-foot">
+        <div class="cat-label" style="color:#c9d4db">The Hall of Fame Choice</div>
+        <div class="mov-title">Casablanca</div>
+        <div class="fit-badge">76% resonance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION C -->
+<div class="option">
+  <div class="option-label">C — Magazine</div>
+  <div class="option-desc">Asymmetric mosaic — no card is "first". Synopsis hidden behind show more.</div>
+  <div class="rx-title">YOUR PRESCRIPTION:</div>
+  <div class="magazine">
+    <div class="mag-card big" style="border-color:#f4a7b9">
+      <div class="poster" style="min-height:320px">
+        <img src="https://image.tmdb.org/t/p/w342/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="" style="width:100%;height:100%;object-fit:cover;min-height:320px">
+      </div>
+      <div class="card-body">
+        <div class="cat-label" style="color:#f4a7b9">The Popular Choice</div>
+        <div class="mov-title">The Shawshank Redemption</div>
+        <div class="meta">1994 · Frank Darabont</div>
+        <div class="synopsis">Andy's refusal to surrender mirrors your need to believe in something beyond the walls.</div>
+        <div class="fit-badge" style="color:#f4a7b9; border-color:rgba(244,167,185,0.2); background:rgba(244,167,185,0.07)">94% resonance</div>
+      </div>
+    </div>
+    <div class="mag-card" style="border-color:#7ecba8">
+      <div class="poster" style="height:160px"><img src="https://image.tmdb.org/t/p/w342/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg" alt="" style="width:100%;height:160px;object-fit:cover"></div>
+      <div class="card-body">
+        <div class="cat-label" style="color:#7ecba8">The Animated One</div>
+        <div class="mov-title">Spirited Away</div>
+        <div class="meta">2001 · Hayao Miyazaki</div>
+        <div class="show-more">+ show more</div>
+        <div class="fit-badge" style="color:#7ecba8; border-color:rgba(126,203,168,0.2); background:rgba(126,203,168,0.07)">91% resonance</div>
+      </div>
+    </div>
+    <div class="mag-card" style="border-color:#ce93d8">
+      <div class="poster" style="height:160px"><img src="https://image.tmdb.org/t/p/w342/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg" alt="" style="width:100%;height:160px;object-fit:cover"></div>
+      <div class="card-body">
+        <div class="cat-label" style="color:#ce93d8">The World Cinema One</div>
+        <div class="mov-title">Parasite</div>
+        <div class="meta">2019 · Bong Joon-ho</div>
+        <div class="show-more">+ show more</div>
+        <div class="fit-badge" style="color:#ce93d8; border-color:rgba(206,147,216,0.2); background:rgba(206,147,216,0.07)">88% resonance</div>
+      </div>
+    </div>
+    <div class="mag-card" style="border-color:#4dd0e1">
+      <div class="poster" style="height:160px"><img src="https://image.tmdb.org/t/p/w342/9rCMpXSJeQfOi0gS3HjDPXFnaaH.jpg" alt="" style="width:100%;height:160px;object-fit:cover"></div>
+      <div class="card-body">
+        <div class="cat-label" style="color:#4dd0e1">The Hidden Gem</div>
+        <div class="mov-title">Adaptation</div>
+        <div class="meta">2002 · Spike Jonze</div>
+        <div class="show-more">+ show more</div>
+        <div class="fit-badge" style="color:#4dd0e1; border-color:rgba(77,208,225,0.2); background:rgba(77,208,225,0.07)">81% resonance</div>
+      </div>
+    </div>
+    <div class="mag-card" style="border-color:#c9d4db">
+      <div class="poster" style="height:160px"><img src="https://image.tmdb.org/t/p/w342/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg" alt="" style="width:100%;height:160px;object-fit:cover"></div>
+      <div class="card-body">
+        <div class="cat-label" style="color:#c9d4db">The Hall of Fame Choice</div>
+        <div class="mov-title">Casablanca</div>
+        <div class="meta">1942 · Michael Curtiz</div>
+        <div class="show-more">+ show more</div>
+        <div class="fit-badge" style="color:#c9d4db; border-color:rgba(201,212,219,0.2); background:rgba(201,212,219,0.07)">76% resonance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION D -->
+<div class="option">
+  <div class="option-label">D — Filmstrip</div>
+  <div class="option-desc">All 5 posters in a strip. Click one to expand details below.</div>
+  <div class="rx-title">YOUR PRESCRIPTION:</div>
+  <div class="filmstrip-wrap">
+    <div class="sprockets">
+      <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+      <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+      <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+    </div>
+    <div class="film-row">
+      <div class="film-cell">
+        <div class="poster" style="aspect-ratio:2/3; border:2px solid #f4a7b9; border-radius:4px">
+          <img src="https://image.tmdb.org/t/p/w342/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="film-info">
+          <div class="cat-label" style="color:#f4a7b9">Popular</div>
+          <div class="mov-title">The Shawshank Redemption</div>
+        </div>
+      </div>
+      <div class="film-cell">
+        <div class="poster" style="aspect-ratio:2/3; border:2px solid #0d2035; border-radius:4px">
+          <img src="https://image.tmdb.org/t/p/w342/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg" alt="" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="film-info">
+          <div class="cat-label" style="color:#7ecba8">Animated</div>
+          <div class="mov-title">Spirited Away</div>
+        </div>
+      </div>
+      <div class="film-cell">
+        <div class="poster" style="aspect-ratio:2/3; border:2px solid #0d2035; border-radius:4px">
+          <img src="https://image.tmdb.org/t/p/w342/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg" alt="" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="film-info">
+          <div class="cat-label" style="color:#ce93d8">World Cinema</div>
+          <div class="mov-title">Parasite</div>
+        </div>
+      </div>
+      <div class="film-cell">
+        <div class="poster" style="aspect-ratio:2/3; border:2px solid #0d2035; border-radius:4px">
+          <img src="https://image.tmdb.org/t/p/w342/9rCMpXSJeQfOi0gS3HjDPXFnaaH.jpg" alt="" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="film-info">
+          <div class="cat-label" style="color:#4dd0e1">Hidden Gem</div>
+          <div class="mov-title">Adaptation</div>
+        </div>
+      </div>
+      <div class="film-cell">
+        <div class="poster" style="aspect-ratio:2/3; border:2px solid #0d2035; border-radius:4px">
+          <img src="https://image.tmdb.org/t/p/w342/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg" alt="" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="film-info">
+          <div class="cat-label" style="color:#c9d4db">Hall of Fame</div>
+          <div class="mov-title">Casablanca</div>
+        </div>
+      </div>
+    </div>
+    <div class="sprockets" style="margin-top:8px;margin-bottom:0">
+      <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+      <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+      <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+    </div>
+    <!-- expanded detail panel -->
+    <div class="film-detail">
+      <div class="det-poster"><img src="https://image.tmdb.org/t/p/w342/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt=""></div>
+      <div class="det-body">
+        <div class="det-title" style="color:#f4a7b9">The Shawshank Redemption <span style="color:#5a7a95;font-size:0.8rem;font-family:'DM Sans',sans-serif;font-weight:300">(1994)</span></div>
+        <div class="det-meta">dir. Frank Darabont · 94% resonance</div>
+        <div class="det-why">Andy's refusal to surrender mirrors your need to believe in something beyond the walls. Two imprisoned men bond over a number of years, finding solace and eventually redemption.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION E -->
+<div class="option">
+  <div class="option-label">E — Prescription Pad</div>
+  <div class="option-desc">Styled like a doctor's Rx notepad — on-brand and quirky.</div>
+  <div class="rx-pad">
+    <div class="rx-pad-header">
+      <div class="rx-pad-logo">not the movie you want,<strong>The movie you NEED.</strong></div>
+      <div class="rx-symbol">℞</div>
+    </div>
+    <div class="rx-line">
+      <div class="rx-checkbox"><div class="rx-check" style="display:block"></div></div>
+      <div class="rx-thumb"><img src="https://image.tmdb.org/t/p/w342/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt=""></div>
+      <div class="rx-info">
+        <div class="rx-cat" style="color:#b8763a">The Popular Choice</div>
+        <div class="rx-title">The Shawshank Redemption</div>
+        <div class="rx-dose">94% resonance · 1994 · Frank Darabont</div>
+      </div>
+    </div>
+    <div class="rx-line">
+      <div class="rx-checkbox"></div>
+      <div class="rx-thumb"><img src="https://image.tmdb.org/t/p/w342/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg" alt=""></div>
+      <div class="rx-info">
+        <div class="rx-cat">The Animated One</div>
+        <div class="rx-title">Spirited Away</div>
+        <div class="rx-dose">91% resonance · 2001 · Hayao Miyazaki</div>
+      </div>
+    </div>
+    <div class="rx-line">
+      <div class="rx-checkbox"></div>
+      <div class="rx-thumb"><img src="https://image.tmdb.org/t/p/w342/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg" alt=""></div>
+      <div class="rx-info">
+        <div class="rx-cat">The World Cinema One</div>
+        <div class="rx-title">Parasite</div>
+        <div class="rx-dose">88% resonance · 2019 · Bong Joon-ho</div>
+      </div>
+    </div>
+    <div class="rx-line">
+      <div class="rx-checkbox"></div>
+      <div class="rx-thumb"><img src="https://image.tmdb.org/t/p/w342/9rCMpXSJeQfOi0gS3HjDPXFnaaH.jpg" alt=""></div>
+      <div class="rx-info">
+        <div class="rx-cat">The Hidden Gem</div>
+        <div class="rx-title">Adaptation</div>
+        <div class="rx-dose">81% resonance · 2002 · Spike Jonze</div>
+      </div>
+    </div>
+    <div class="rx-line">
+      <div class="rx-checkbox"></div>
+      <div class="rx-thumb"><img src="https://image.tmdb.org/t/p/w342/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg" alt=""></div>
+      <div class="rx-info">
+        <div class="rx-cat">The Hall of Fame Choice</div>
+        <div class="rx-title">Casablanca</div>
+        <div class="rx-dose">76% resonance · 1942 · Michael Curtiz</div>
+      </div>
+    </div>
+    <div class="rx-sig">Sig: watch one. feel something. repeat as needed.</div>
+  </div>
+</div>
+
+</body>
+</html>
