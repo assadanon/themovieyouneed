@@ -615,9 +615,9 @@ section { position: relative; z-index: 1; }
 /* Category label — replaces rank number */
 .category-label {
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.2em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--cat-color, var(--text-muted));
   margin-bottom: 0.15rem;
