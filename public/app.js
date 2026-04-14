@@ -453,11 +453,10 @@ function renderResults({ profile, recommendations }) {
     return;
   }
 
-  // Ordered display: popular, indie, animation, classic, world_cinema
-  const order = ['popular', 'indie', 'animation', 'classic', 'world_cinema'];
-  const sorted = order.map(cat => recommendations.find(r => r.category === cat)).filter(Boolean);
+  // Sort by fit_percentage descending — highest match first
+  const sorted = [...recommendations].sort((a, b) => b.fit_percentage - a.fit_percentage);
 
-  // Row 1: popular — solo
+  // Row 1: highest match — solo
   if (sorted[0]) {
     const row1 = document.createElement('div');
     row1.className = 'cards-row cards-row-single';
@@ -465,14 +464,14 @@ function renderResults({ profile, recommendations }) {
     recommendationsEl.appendChild(row1);
   }
 
-  // Row 2: indie + animation
+  // Row 2: 2nd + 3rd
   const row2 = document.createElement('div');
   row2.className = 'cards-row';
   if (sorted[1]) row2.appendChild(createMovieCard(sorted[1]));
   if (sorted[2]) row2.appendChild(createMovieCard(sorted[2]));
   if (row2.children.length) recommendationsEl.appendChild(row2);
 
-  // Row 3: classic + world cinema
+  // Row 3: 4th + 5th
   const row3 = document.createElement('div');
   row3.className = 'cards-row';
   if (sorted[3]) row3.appendChild(createMovieCard(sorted[3]));
