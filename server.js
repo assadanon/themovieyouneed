@@ -201,10 +201,20 @@ async function fetchAnimationPool() {
 }
 
 async function fetchClassicPool() {
-  // Pre-1985 films — randomise pages so different classics surface each run
+  // Pre-1985 icons — high vote_count threshold ensures only genuinely famous must-watch classics
   const pages = randPages(3, 1, 6);
   const results = await Promise.all(pages.map(p =>
-    tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=200&primary_release_date.lte=1985-12-31&page=${p}`)
+    tmdbFetch(`/discover/movie?sort_by=vote_count.desc&vote_count.gte=5000&primary_release_date.lte=1985-12-31&page=${p}`)
+      .then(d => filterMovies(d.results)).catch(() => [])
+  ));
+  return shuffle(results.flat()).slice(0, 18);
+}
+
+async function fetchShortPool() {
+  // Films ≤ 110 minutes — compact, well-regarded
+  const pages = randPages(3, 1, 12);
+  const results = await Promise.all(pages.map(p =>
+    tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_runtime.lte=110&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
   return shuffle(results.flat()).slice(0, 18);
@@ -276,8 +286,9 @@ async function rankByCategoryWithClaude(profile, pools) {
     fmt('MAINSTREAM POOL — for "popular" category (high vote count, widely seen)', pools.popular),
     fmt('INDIE POOL — for "indie" category (art-house, lesser-known, lower vote count preferred)', pools.indie),
     fmt('ANIMATION POOL — for "animation" category (must be animated film)', pools.animation),
-    fmt('CLASSIC POOL — for "classic" category (pre-1985)', pools.classic),
+    fmt('CLASSIC POOL — for "classic" category (pre-1985, legendary all-time greats)', pools.classic),
     fmt('WORLD CINEMA POOL — for "world_cinema" category (non-English language only)', pools.world_cinema),
+    fmt('SHORT FILM POOL — for "short" category (runtime ≤ 110 minutes)', pools.short),
   ].join('\n\n');
 
   const prompt = `You are a film therapist and narrative psychologist. Your task is NARRATIVE MIRRORING: match each film's protagonist journey to this viewer's psychological need.
@@ -299,7 +310,8 @@ Select exactly ONE film from each pool. Rules:
 - INDIE: choose the least commercially known film that still serves the need — prefer hidden gems over accessible hits
 - WORLD CINEMA: must be a non-English language film — no exceptions
 - ANIMATION: must be an animated film — no exceptions
-- CLASSIC: must be pre-1985
+- CLASSIC: must be pre-1985; choose a genuinely legendary all-time great, not an obscure pick — these are icons everyone should see
+- SHORT: choose the film with the best psychological fit that is ≤ 110 minutes runtime
 - Do NOT repeat the same film across categories
 - Foreign and non-English films are equally valid across all categories
 - CRITICAL: Do NOT default to the most famous or obvious film in a pool. The pools are randomised — treat every candidate equally. Pick based purely on psychological fit, not cultural prominence. A lesser-known film that truly mirrors the viewer's need beats a famous one that only loosely fits.
@@ -307,17 +319,17 @@ Select exactly ONE film from each pool. Rules:
 ${candidateSection}
 
 For each film:
-- "category": exactly one of: "popular", "indie", "animation", "classic", "world_cinema"
+- "category": exactly one of: "popular", "indie", "animation", "classic", "world_cinema", "short"
 - "tmdb_id": the numeric ID before the pipe
 - "why_this_film": one sentence addressed to the viewer ("you"), naming the protagonist's journey and how it serves their specific need. Under 25 words.
 - "fit_percentage": how well this film serves this person's psychological needs (honest — not every category will be a perfect fit). Range 62–97, no two identical.
 
 Return ONLY JSON (no backticks):
-{"recommendations":[{"category":"popular","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"indie","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"animation","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"classic","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"world_cinema","tmdb_id":0,"why_this_film":"...","fit_percentage":0}]}`;
+{"recommendations":[{"category":"popular","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"indie","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"animation","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"classic","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"world_cinema","tmdb_id":0,"why_this_film":"...","fit_percentage":0},{"category":"short","tmdb_id":0,"why_this_film":"...","fit_percentage":0}]}`;
 
   const msg = await anthropic.messages.create({
     model: 'claude-opus-4-6',
-    max_tokens: 1200,
+    max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
 
@@ -346,15 +358,16 @@ app.post('/api/quiz', async (req, res) => {
 
     // 3. Fetch category pools in parallel
     console.log('Fetching category pools...');
-    const [popularPool, indiePool, animationPool, classicPool, worldPool] = await Promise.all([
+    const [popularPool, indiePool, animationPool, classicPool, worldPool, shortPool] = await Promise.all([
       fetchPopularPool().catch(e => { console.error('popular pool failed:', e.message); return []; }),
       fetchIndiePool().catch(e => { console.error('indie pool failed:', e.message); return []; }),
       fetchAnimationPool().catch(e => { console.error('animation pool failed:', e.message); return []; }),
       fetchClassicPool().catch(e => { console.error('classic pool failed:', e.message); return []; }),
       fetchWorldCinemaPool().catch(e => { console.error('world pool failed:', e.message); return []; }),
+      fetchShortPool().catch(e => { console.error('short pool failed:', e.message); return []; }),
     ]);
 
-    console.log(`Pool sizes — popular:${popularPool.length} indie:${indiePool.length} animation:${animationPool.length} classic:${classicPool.length} world:${worldPool.length}`);
+    console.log(`Pool sizes — popular:${popularPool.length} indie:${indiePool.length} animation:${animationPool.length} classic:${classicPool.length} world:${worldPool.length} short:${shortPool.length}`);
 
     const pools = {
       popular:      popularPool,
@@ -362,6 +375,7 @@ app.post('/api/quiz', async (req, res) => {
       animation:    animationPool,
       classic:      classicPool,
       world_cinema: worldPool,
+      short:        shortPool,
     };
 
     const totalCandidates = Object.values(pools).reduce((s, p) => s + p.length, 0);
@@ -373,34 +387,38 @@ app.post('/api/quiz', async (req, res) => {
     console.log('Claude Call 2: ranking by category...');
     const { recommendations } = await rankByCategoryWithClaude(profile, pools);
 
-    // 5. Enrich each recommendation with credits + synopsis
-    const allMovies = [...popularPool, ...indiePool, ...animationPool, ...classicPool, ...worldPool];
+    // 5. Enrich each recommendation with credits, runtime + synopsis
+    const allMovies = [...popularPool, ...indiePool, ...animationPool, ...classicPool, ...worldPool, ...shortPool];
     const movieMap  = {};
     for (const m of allMovies) movieMap[m.id] = m;
 
     const enriched = await Promise.all(
-      recommendations.slice(0, 5).map(async (rec) => {
+      recommendations.slice(0, 6).map(async (rec) => {
         const movie = movieMap[rec.tmdb_id];
         if (!movie) {
           console.warn(`Movie ID ${rec.tmdb_id} not found in any pool`);
           return null;
         }
 
-        const credits  = await getMovieCredits(movie.id).catch(() => ({ crew: [], cast: [] }));
+        // Fetch credits and full details (for runtime) in parallel
+        const [credits, details] = await Promise.all([
+          getMovieCredits(movie.id).catch(() => ({ crew: [], cast: [] })),
+          tmdbFetch(`/movie/${movie.id}`).catch(() => ({})),
+        ]);
         const director = credits.crew?.find(c => c.job === 'Director')?.name || 'Unknown';
         const actors   = (credits.cast || []).slice(0, 3).map(a => a.name);
+        const runtime  = details.runtime || null; // minutes
 
         const overview = movie.overview || '';
         let synopsis = overview;
-        if (overview.length > 120) {
-          // Prefer ending at a sentence boundary within 40–120 chars
-          const sentenceMatch = overview.match(/^[\s\S]{40,120}?[.!?](?=\s|$)/);
+        if (overview.length > 350) {
+          // Prefer ending at a sentence boundary within 150–350 chars
+          const sentenceMatch = overview.match(/^[\s\S]{100,350}?[.!?](?=\s|$)/);
           if (sentenceMatch) {
             synopsis = sentenceMatch[0];
           } else {
-            // Fall back to word boundary
-            const cut = overview.lastIndexOf(' ', 110);
-            synopsis = (cut > 20 ? overview.slice(0, cut) : overview.slice(0, 110)) + '…';
+            const cut = overview.lastIndexOf(' ', 300);
+            synopsis = (cut > 50 ? overview.slice(0, cut) : overview.slice(0, 300)) + '…';
           }
         }
 
@@ -412,6 +430,7 @@ app.post('/api/quiz', async (req, res) => {
           poster:       movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
           director,
           actors,
+          runtime,
           synopsis,
           why_this_film:   rec.why_this_film,
           fit_percentage:  rec.fit_percentage,

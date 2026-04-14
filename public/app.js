@@ -1,10 +1,11 @@
 // ── Categories ────────────────────────────────────────────────────────────────
 const CATEGORIES = {
-  popular:      { label: 'The Popular Choice',      shortName: 'popular',      color: '#f4a7b9' },
-  indie:        { label: 'The Hidden Gem',           shortName: 'hidden gem',   color: '#4dd0e1' },
-  animation:    { label: 'The Animated One',         shortName: 'animated',     color: '#7ecba8' },
-  classic:      { label: 'The Hall of Fame Choice',  shortName: 'hall of fame', color: '#c9d4db' },
-  world_cinema: { label: 'The World Cinema One',     shortName: 'world cinema', color: '#ce93d8' },
+  popular:      { label: 'The Popular Choice',           shortName: 'popular',       color: '#f4a7b9' },
+  indie:        { label: 'The Hidden Gem',                shortName: 'hidden gem',    color: '#4dd0e1' },
+  animation:    { label: 'The Animated One',              shortName: 'animated',      color: '#7ecba8' },
+  classic:      { label: 'The Hall of Fame Choice',       shortName: 'hall of fame',  color: '#c9d4db' },
+  world_cinema: { label: 'The World Cinema One',          shortName: 'world cinema',  color: '#ce93d8' },
+  short:        { label: 'The Under 100 Minutes Choice',  shortName: 'under 100 min', color: '#ffa94d' },
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -456,18 +457,35 @@ function renderResults({ profile, recommendations }) {
   // Sort by fit_percentage descending — highest match first
   const sorted = [...recommendations].sort((a, b) => b.fit_percentage - a.fit_percentage);
 
-  // Magazine grid: big card (highest %) + 4 smaller cards
+  // 2×3 expandable grid
   const grid = document.createElement('div');
-  grid.className = 'magazine-grid';
-  sorted.forEach((rec, i) => grid.appendChild(createMovieCard(rec, i === 0)));
+  grid.className = 'rx-grid';
+
+  const cards = sorted.map(rec => createMovieCard(rec));
+  cards.forEach(card => grid.appendChild(card));
   recommendationsEl.appendChild(grid);
 
-  // Staggered reveal
-  recommendationsEl.querySelectorAll('.mag-card').forEach((card, i) => {
-    setTimeout(() => card.classList.add('revealed'), i * 120);
+  // Wire up expansion
+  cards.forEach((card, i) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.card-tmdb-link') || e.target.closest('.card-close-btn')) return;
+      toggleCardExpand(i, cards, grid);
+    });
+    const closeBtn = card.querySelector('.card-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        collapseAllCards(cards);
+      });
+    }
   });
 
-  // Our choice — the recommendation with the highest fit_percentage
+  // Staggered reveal
+  cards.forEach((card, i) => {
+    setTimeout(() => card.classList.add('revealed'), i * 100);
+  });
+
+  // Our choice — highest fit_percentage
   const best = recommendations.reduce((a, b) =>
     a.fit_percentage > b.fit_percentage ? a : b
   );
@@ -482,46 +500,97 @@ function renderResults({ profile, recommendations }) {
   }, 200);
 }
 
-function createMovieCard(movie, isBig = false) {
-  const cat  = CATEGORIES[movie.category] || {};
-  const card = document.createElement('div');
-  card.className = isBig ? 'mag-card mag-card-big' : 'mag-card';
-  card.style.setProperty('--cat-color', cat.color || 'var(--bg3)');
+function collapseAllCards(cards) {
+  cards.forEach(c => {
+    c.classList.remove('card-expanded');
+    c.style.gridColumn = '';
+    c.style.gridRow = '';
+  });
+}
 
-  if (movie.tmdb_id) {
-    card.addEventListener('click', (e) => {
-      if (!e.target.closest('.show-more-btn')) {
-        window.open(`https://www.themoviedb.org/movie/${movie.tmdb_id}`, '_blank', 'noopener');
-      }
+function toggleCardExpand(cardIndex, cards, grid) {
+  const wasExpanded = cards[cardIndex].classList.contains('card-expanded');
+  collapseAllCards(cards);
+  if (!wasExpanded) {
+    doExpandCard(cardIndex, cards);
+    setTimeout(() => cards[cardIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
+  }
+}
+
+function doExpandCard(cardIndex, cards) {
+  const card = cards[cardIndex];
+  const row  = Math.floor(cardIndex / 3); // 0 or 1
+  const col  = cardIndex % 3;
+
+  card.classList.add('card-expanded');
+  card.style.gridColumn = '1 / -1';
+
+  if (row === 0) {
+    // Expanded card in row 1
+    card.style.gridRow = '1';
+    // Other row-0 cards → row 2
+    const othersR0 = [0, 1, 2].filter(j => j !== col);
+    othersR0.forEach((origCol, k) => {
+      if (cards[origCol]) { cards[origCol].style.gridRow = '2'; cards[origCol].style.gridColumn = String(k + 1); }
+    });
+    // Row-1 cards → row 3
+    [3, 4, 5].forEach((j, k) => {
+      if (cards[j]) { cards[j].style.gridRow = '3'; cards[j].style.gridColumn = String(k + 1); }
+    });
+  } else {
+    // Row-0 cards stay at row 1
+    [0, 1, 2].forEach((j, k) => {
+      if (cards[j]) { cards[j].style.gridRow = '1'; cards[j].style.gridColumn = String(k + 1); }
+    });
+    // Expanded card in row 2
+    card.style.gridRow = '2';
+    // Other row-1 cards → row 3
+    const othersR1 = [3, 4, 5].filter(j => j !== cardIndex);
+    othersR1.forEach((j, k) => {
+      if (cards[j]) { cards[j].style.gridRow = '3'; cards[j].style.gridColumn = String(k + 1); }
     });
   }
+}
+
+function createMovieCard(movie) {
+  const cat  = CATEGORIES[movie.category] || {};
+  const card = document.createElement('div');
+  card.className = 'rx-card';
+  card.style.setProperty('--cat-color', cat.color || 'var(--bg3)');
 
   const posterHTML = movie.poster
     ? `<img src="${movie.poster}" alt="${escapeHtml(movie.title)}" loading="lazy">`
     : `<div class="poster-placeholder">🎬</div>`;
 
-  const synopsis = movie.synopsis || '';
-  const crewText = `<span class="crew-label">dir.</span> ${escapeHtml(movie.director || '')}`;
+  const actorsLine = (movie.actors || []).join(' · ');
+  const crewLine   = [
+    movie.director ? `<span class="crew-dir">dir.</span> ${escapeHtml(movie.director)}` : '',
+    actorsLine ? escapeHtml(actorsLine) : '',
+  ].filter(Boolean).join('<span class="crew-sep"> · </span>');
+
+  const runtimeText  = movie.runtime ? `${movie.runtime} min` : '';
+  const tmdbUrl      = `https://www.themoviedb.org/movie/${movie.tmdb_id}`;
+  const whyText      = movie.why_this_film || '';
+  const synopsisText = movie.synopsis || '';
 
   card.innerHTML = `
-    <div class="mag-poster">${posterHTML}</div>
-    <div class="mag-body">
-      <div class="category-label">${escapeHtml(cat.label || movie.category)}</div>
-      <div class="movie-title">${escapeHtml(movie.title)}<span class="movie-year">(${movie.year})</span></div>
-      <div class="movie-crew">${crewText}</div>
-      ${synopsis ? `<p class="movie-synopsis">${escapeHtml(synopsis)}</p><button class="show-more-btn">+ show more</button>` : ''}
+    <div class="card-poster-wrap">${posterHTML}</div>
+    <div class="card-content">
+      <div class="card-category-label">${escapeHtml(cat.label || movie.category)}</div>
+      <div class="card-title">${escapeHtml(movie.title)}<span class="card-year"> (${movie.year})</span></div>
+      <div class="card-crew">${crewLine}</div>
+      <div class="card-expandable">
+        ${whyText      ? `<p class="card-why">${escapeHtml(whyText)}</p>` : ''}
+        ${synopsisText ? `<p class="card-synopsis">${escapeHtml(synopsisText)}</p>` : ''}
+        <div class="card-meta">
+          ${runtimeText         ? `<span class="card-runtime">⏱ ${runtimeText}</span>` : ''}
+          ${movie.tmdb_id       ? `<a class="card-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
+        </div>
+      </div>
       <span class="fit-badge">${movie.fit_percentage}% resonance</span>
     </div>
+    <button class="card-close-btn" aria-label="Close">×</button>
   `;
-
-  if (synopsis) {
-    const btn = card.querySelector('.show-more-btn');
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const expanded = card.classList.toggle('synopsis-expanded');
-      btn.textContent = expanded ? '− show less' : '+ show more';
-    });
-  }
 
   return card;
 }
