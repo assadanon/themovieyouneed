@@ -543,19 +543,7 @@ section { position: relative; z-index: 1; }
   position: relative; /* anchors the connecting outline */
 }
 
-/* ── L-stroke: two animated bars connecting ghost card shell to panel ──────── */
-/* Vertical stem + horizontal foot form an L (ghost above) or ⌐ (ghost below)  */
-.rx-stroke {
-  position: absolute;
-  background: var(--stroke-color, var(--text-dim));
-  pointer-events: none;
-  opacity: 0;
-  border-radius: 3px;
-  z-index: 4;
-  box-shadow: 0 0 8px 1px var(--stroke-color, transparent);
-}
-.rx-stroke-v { width: 3px; height: 0; }
-.rx-stroke-h { height: 3px; width:  0; }
+/* ── SVG perimeter stroke (injected by JS, no CSS needed) ─────────────────── */
 
 /* Each row is a 3-column grid */
 .rx-row {
