@@ -489,6 +489,46 @@ function renderResults({ profile, recommendations }) {
   let expandedIndex = null;
   let panelBusy     = false;
 
+  // Collapse a card's body down to just its band (smooth slide-up)
+  function collapseCardBody(card) {
+    const body = card.querySelector('.card-body');
+    if (!body) return;
+    const h = body.offsetHeight;
+    card.dataset.bodyH = h; // remember for the expand animation
+    // Remove flex:1 so explicit height wins, then animate to 0
+    body.style.flex       = 'none';
+    body.style.overflow   = 'hidden';
+    body.style.transition = 'none';
+    body.style.height     = h + 'px';
+    card.classList.add('card-selected');
+    // Double rAF ensures the painted start-height is committed before transition starts
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+      body.style.height     = '0px';
+    }));
+  }
+
+  // Expand a card's body back to its original height (smooth slide-down)
+  function expandCardBody(card) {
+    const body = card.querySelector('.card-body');
+    if (!body) return;
+    const target = parseInt(card.dataset.bodyH, 10) || 0;
+    card.classList.remove('card-selected');
+    body.style.transition = 'none';
+    body.style.height     = '0px';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+      body.style.height     = target + 'px';
+      setTimeout(() => {
+        body.style.flex       = '';
+        body.style.height     = '';
+        body.style.overflow   = '';
+        body.style.transition = '';
+        delete card.dataset.bodyH;
+      }, 520);
+    }));
+  }
+
   function wireCloseBtn() {
     const btn = expandedPanel.querySelector('.ep-close-btn');
     if (btn) btn.addEventListener('click', e => { e.stopPropagation(); closePanel(); });
@@ -498,7 +538,7 @@ function renderResults({ profile, recommendations }) {
     if (panelBusy) return;
     panelBusy = true;
     expandedIndex = i;
-    cards[i].classList.add('card-ghost');
+    collapseCardBody(cards[i]);
 
     expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
     wireCloseBtn();
@@ -506,7 +546,7 @@ function renderResults({ profile, recommendations }) {
     // Animate height 0 → natural height (1.5s)
     expandedPanel.style.transition = 'none';
     expandedPanel.style.height = '0px';
-    expandedPanel.getBoundingClientRect(); // force layout
+    expandedPanel.getBoundingClientRect();
     const target = expandedPanel.scrollHeight;
     expandedPanel.style.transition = 'height 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
     expandedPanel.style.height = target + 'px';
@@ -521,9 +561,9 @@ function renderResults({ profile, recommendations }) {
     const prev = expandedIndex;
     expandedIndex = i;
 
-    // Swap ghosts
-    cards[prev].classList.remove('card-ghost');
-    cards[i].classList.add('card-ghost');
+    // Animate old card back, new card collapses
+    expandCardBody(cards[prev]);
+    collapseCardBody(cards[i]);
 
     // Crossfade panel content
     const inner = expandedPanel.querySelector('.ep-inner');
@@ -545,7 +585,10 @@ function renderResults({ profile, recommendations }) {
     const prev = expandedIndex;
     expandedIndex = null;
 
-    // Freeze at current height then animate to 0 (0.8s)
+    // Expand the previously collapsed card back
+    if (prev !== null) expandCardBody(cards[prev]);
+
+    // Freeze panel height then animate to 0 (0.8s)
     const h = expandedPanel.scrollHeight;
     expandedPanel.style.transition = 'none';
     expandedPanel.style.height = h + 'px';
@@ -554,7 +597,6 @@ function renderResults({ profile, recommendations }) {
     expandedPanel.style.height = '0px';
 
     setTimeout(() => {
-      if (prev !== null) cards[prev].classList.remove('card-ghost');
       expandedPanel.innerHTML = '';
       expandedPanel.style.transition = '';
       panelBusy = false;
@@ -653,11 +695,13 @@ function createMovieCard(movie) {
     <div class="card-band" style="background:${cat.color || 'var(--bg3)'}">
       <span class="card-band-label">${escapeHtml(cat.label || movie.category)}</span>
     </div>
-    <div class="card-poster-wrap">${posterHTML}</div>
-    <div class="card-content">
-      <div class="card-title">${escapeHtml(movie.title)}<span class="card-year"> (${movie.year})</span></div>
-      <div class="card-crew">${crewLine}</div>
-      <span class="fit-badge">${movie.fit_percentage}% resonance</span>
+    <div class="card-body">
+      <div class="card-poster-wrap">${posterHTML}</div>
+      <div class="card-content">
+        <div class="card-title">${escapeHtml(movie.title)}<span class="card-year"> (${movie.year})</span></div>
+        <div class="card-crew">${crewLine}</div>
+        <span class="fit-badge">${movie.fit_percentage}% resonance</span>
+      </div>
     </div>
   `;
 

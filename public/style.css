@@ -720,6 +720,7 @@ section { position: relative; z-index: 1; }
 
 .rx-card.revealed {
   animation: cardReveal 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 1; /* holds opacity after animation ends so cancelling it (card-selected) doesn't snap back to 0 */
 }
 
 @keyframes cardReveal {
@@ -727,7 +728,7 @@ section { position: relative; z-index: 1; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.rx-card:hover:not(.card-ghost) {
+.rx-card:hover:not(.card-selected) {
   box-shadow: 0 0 0 1px var(--cat-color, transparent), 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -754,23 +755,34 @@ section { position: relative; z-index: 1; }
 /* ── Card category band (MD3-inspired coloured header) ───────────────────── */
 .card-band {
   width: 100%;
-  padding: 0.42rem 0.9rem;
+  padding: 0.55rem 0.9rem;
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  transition: padding 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              border-radius 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.45s ease;
 }
 
 .card-band-label {
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: #0d1f33;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Card body (poster + info — this collapses when card is selected) ──────── */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
 }
 
 /* ── Card content ────────────────────────────────────────────────────────────*/
@@ -822,13 +834,21 @@ section { position: relative; z-index: 1; }
   align-self: flex-start;
 }
 
-/* ── Ghost state: selected card stays in grid but turns invisible ─────────── */
-/* animation:none cancels the cardReveal forwards-fill that would lock opacity:1 */
-.rx-card.card-ghost {
-  animation: none;
-  opacity: 0;
+/* ── Selected state: body collapses, card becomes a category-coloured shell ── */
+.rx-card.card-selected {
+  animation: none; /* cancel cardReveal forwards-fill */
+  opacity: 1;      /* prevent reverting to rx-card's base opacity:0 */
   pointer-events: none;
-  transition: opacity 0.4s ease;
+  cursor: default;
+  /* Coloured shell: clear tint + solid category-colour border */
+  background: color-mix(in srgb, var(--cat-color) 14%, transparent);
+  box-shadow: 0 0 0 2px var(--cat-color) !important;
+  transition: background 0.45s ease, box-shadow 0.45s ease;
+}
+
+/* Band stays fully visible — it's the identity label for what's open below */
+.rx-card.card-selected .card-band {
+  opacity: 1;
 }
 
 /* ── Our Choice ──────────────────────────────────────────────────────────────*/
