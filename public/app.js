@@ -512,66 +512,42 @@ function renderResults({ profile, recommendations }) {
   function scrollToCenter(i) {
     const cardRect  = cards[i].getBoundingClientRect();
     const panelRect = expandedPanel.getBoundingClientRect();
-    const topAbs = (i < 3 ? cardRect.top  : panelRect.top)    + window.scrollY;
-    const botAbs = (i < 3 ? panelRect.bottom : cardRect.bottom) + window.scrollY;
-    const midpoint = (topAbs + botAbs) / 2;
-    window.scrollTo({ top: Math.max(0, midpoint - window.innerHeight / 2), behavior: 'smooth' });
+    const topVp  = i < 3 ? cardRect.top    : panelRect.top;
+    const botVp  = i < 3 ? panelRect.bottom : cardRect.bottom;
+    const groupH = botVp - topVp;
+    const topAbs = topVp + window.scrollY;
+    const botAbs = botVp + window.scrollY;
+    const midAbs = (topAbs + botAbs) / 2;
+    // Center the group; if too tall for viewport, show from top with margin
+    const scroll = groupH >= window.innerHeight
+      ? topAbs - 24
+      : midAbs - window.innerHeight / 2;
+    window.scrollTo({ top: Math.max(0, scroll), behavior: 'smooth' });
   }
 
-  // ── Fade-out (content + band) + height-collapse ───────────────────────────
+  // ── Fade-out (content + band) ─────────────────────────────────────────────
   function collapseCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
-    const h = body.offsetHeight;
-    card.dataset.bodyH = h;
-
-    // Apply card-selected immediately so background tint + band fade
-    // happen in sync with the content fade (not as a sudden jump afterwards)
-    card.classList.add('card-selected');
-
-    // Fade content out softly
-    body.style.transition = 'opacity 0.35s ease';
+    // Fade content out — card keeps its full height (no wipe, no layout shift)
+    body.style.transition = 'opacity 0.4s ease';
     body.style.opacity    = '0';
-
-    // After fade, collapse height (flex:none lets explicit height win)
-    setTimeout(() => {
-      body.style.flex       = 'none';
-      body.style.overflow   = 'hidden';
-      body.style.transition = 'none';
-      body.style.height     = h + 'px';
-      body.style.opacity    = '1'; // reset so it doesn't interfere with expand
-      body.getBoundingClientRect(); // commit height=h before transition (reflow flush)
-      body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-      body.style.height     = '0px';
-    }, 360);
+    // Background tint fades in via CSS transition: background 0.35s on .rx-card
+    card.classList.add('card-selected');
   }
 
-  // ── Height-expand then fade content back in ───────────────────────────────
+  // ── Restore card — fade content back in ──────────────────────────────────
   function expandCardBody(card) {
-    const body   = card.querySelector('.card-body');
+    const body = card.querySelector('.card-body');
     if (!body) return;
-    const target = parseInt(card.dataset.bodyH, 10) || 0;
-
-    body.style.opacity    = '0';
+    // Restore card to normal state — fade content back in
     card.classList.remove('card-selected');
-    body.style.transition = 'none';
-    body.style.height     = '0px';
-    body.getBoundingClientRect(); // commit height=0 before transition (reflow flush)
-    body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-    body.style.height     = target + 'px';
-    // After expand, fade content back in
+    body.style.transition = 'opacity 0.35s ease';
+    body.style.opacity    = '1';
     setTimeout(() => {
-      body.style.transition = 'opacity 0.3s ease';
-      body.style.opacity    = '1';
-      setTimeout(() => {
-        body.style.flex       = '';
-        body.style.height     = '';
-        body.style.overflow   = '';
-        body.style.transition = '';
-        body.style.opacity    = '';
-        delete card.dataset.bodyH;
-      }, 320);
-    }, 520);
+      body.style.transition = '';
+      body.style.opacity    = '';
+    }, 380);
   }
 
   function wireCloseBtn() {
@@ -584,7 +560,7 @@ function renderResults({ profile, recommendations }) {
     panelBusy = true;
     expandedIndex = i;
 
-    // ── Phase 1: ghost card body fades and collapses ───────────────────────────
+    // ── Phase 1: ghost card content fades (card stays full height — no wipe) ───
     collapseCardBody(cards[i]);
 
     expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
@@ -601,51 +577,44 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // ── Phase 2: panel expands (0.9s) ─────────────────────────────────────────
+    // ── Phase 2: panel expands (GPU hint + 0.9s) ───────────────────────────────
+    expandedPanel.style.willChange = 'height';
     expandedPanel.style.transition = 'height 0.9s cubic-bezier(0.4, 0, 0.2, 1)';
     expandedPanel.style.height     = panelTargetH + 'px';
 
-    // ── Phase 2 (T=950ms): stroke fades in as complete perimeter shape ─────────
-    // Measure live after panel + card-collapse animations finish (~900ms each)
-    // Use bandRect so shape is correct regardless of grid-cell stretching
+    // ── T=950ms: measure live positions, build rounded perimeter, fade in ───────
+    // Panel (0.9s) and content fade (0.4s) are both done by this point
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
-      const bandEl    = cards[i].querySelector('.card-band');
-      const bandRect  = (bandEl || cards[i]).getBoundingClientRect();
+      const cardRect2 = cards[i].getBoundingClientRect();
       const panelRect = expandedPanel.getBoundingClientRect();
 
-      const gL = bandRect.left   - gridRect.left;
-      const gR = bandRect.right  - gridRect.left;
-      const gT = bandRect.top    - gridRect.top;
-      const gB = bandRect.bottom - gridRect.top;
-      const pL = 0;
-      const pR = gridRect.width;
+      const gL = cardRect2.left   - gridRect.left;
+      const gR = cardRect2.right  - gridRect.left;
+      const gT = cardRect2.top    - gridRect.top;
+      const gB = cardRect2.bottom - gridRect.top;
+      const pL = 0, pR = gridRect.width;
       const pT = panelRect.top    - gridRect.top;
       const pB = panelRect.bottom - gridRect.top;
 
-      // Perimeter of the union of ghost band + panel:
-      //   Row-0 (ghost above): notch widens at panel top
-      //   Row-1 (ghost below): notch widens at panel bottom
-      let d;
-      if (i < 3) {
-        // Clockwise from ghost band top-left
-        d = `M ${gL} ${gT} L ${gR} ${gT} L ${gR} ${pT} L ${pR} ${pT} L ${pR} ${pB} L ${pL} ${pB} L ${pL} ${pT} L ${gL} ${pT} Z`;
-      } else {
-        // Clockwise from panel top-left
-        d = `M ${pL} ${pT} L ${pR} ${pT} L ${pR} ${pB} L ${gR} ${pB} L ${gR} ${gB} L ${gL} ${gB} L ${gL} ${pB} L ${pL} ${pB} Z`;
-      }
+      // Union perimeter points (clockwise); duplicate points are filtered out
+      // for edge cases where ghost card aligns with panel edge (left/right card)
+      const raw = i < 3
+        ? [[gL,gT],[gR,gT],[gR,pT],[pR,pT],[pR,pB],[pL,pB],[pL,pT],[gL,pT]]
+        : [[pL,pT],[pR,pT],[pR,pB],[gR,pB],[gR,gB],[gL,gB],[gL,pB],[pL,pB]];
+      const pts = raw.filter((p, j, a) => j === 0 || p[0] !== a[j-1][0] || p[1] !== a[j-1][1]);
 
-      strokePath.setAttribute('d', d);
+      strokePath.setAttribute('d', roundedPath(pts, 10));
       strokePath.setAttribute('stroke', catColor);
       strokePath.style.filter = `drop-shadow(0 0 6px ${catColor})`;
       strokeSvg.style.transition = 'none';
       strokeSvg.style.opacity    = '0';
-      strokeSvg.getBoundingClientRect(); // commit opacity=0 before fade
+      strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
     }, 950);
 
-    // ── Phase 3: content fades in ──────────────────────────────────────────────
+    // ── T=1050ms: panel content fades in ──────────────────────────────────────
     setTimeout(() => {
       if (epInner) {
         epInner.style.transition = 'opacity 0.5s ease';
@@ -653,11 +622,13 @@ function renderResults({ profile, recommendations }) {
       }
     }, 1050);
 
+    // ── T=1450ms: unlock; T=1500ms: scroll (after auto-height reflow settles) ──
     setTimeout(() => {
-      expandedPanel.style.height = 'auto';
+      expandedPanel.style.height    = 'auto';
+      expandedPanel.style.willChange = '';
       panelBusy = false;
-      scrollToCenter(i);
     }, 1450);
+    setTimeout(() => scrollToCenter(i), 1500);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)
@@ -672,15 +643,17 @@ function renderResults({ profile, recommendations }) {
 
     // Freeze then animate panel to 0 (0.8s)
     const h = expandedPanel.scrollHeight;
-    expandedPanel.style.transition = 'none';
-    expandedPanel.style.height     = h + 'px';
+    expandedPanel.style.transition  = 'none';
+    expandedPanel.style.height      = h + 'px';
+    expandedPanel.style.willChange  = 'height';
     expandedPanel.getBoundingClientRect();
-    expandedPanel.style.transition = 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
-    expandedPanel.style.height     = '0px';
+    expandedPanel.style.transition  = 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+    expandedPanel.style.height      = '0px';
 
     setTimeout(() => {
       expandedPanel.innerHTML        = '';
       expandedPanel.style.transition = '';
+      expandedPanel.style.willChange = '';
       panelBusy = false;
       if (onDone) onDone();
     }, 820);
@@ -853,6 +826,33 @@ function showPreviewResults() {
       },
     ],
   });
+}
+
+// ── Rounded SVG path from polygon points ──────────────────────────────────────
+// Replaces sharp corners with quadratic bezier curves of radius r
+function roundedPath(pts, r) {
+  const n = pts.length;
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n];
+    const curr = pts[i];
+    const next = pts[(i + 1) % n];
+    const dx1 = curr[0] - prev[0], dy1 = curr[1] - prev[1];
+    const len1 = Math.hypot(dx1, dy1);
+    const dx2 = next[0] - curr[0], dy2 = next[1] - curr[1];
+    const len2 = Math.hypot(dx2, dy2);
+    if (!len1 || !len2) {
+      d += i ? ` L ${curr[0]} ${curr[1]}` : `M ${curr[0]} ${curr[1]}`;
+      continue;
+    }
+    const ar = Math.min(r, len1 / 2, len2 / 2);
+    const ax = curr[0] - (dx1 / len1) * ar, ay = curr[1] - (dy1 / len1) * ar;
+    const bx = curr[0] + (dx2 / len2) * ar, by = curr[1] + (dy2 / len2) * ar;
+    d += i
+      ? ` L ${ax} ${ay} Q ${curr[0]} ${curr[1]} ${bx} ${by}`
+      : `M ${ax} ${ay} Q ${curr[0]} ${curr[1]} ${bx} ${by}`;
+  }
+  return d + ' Z';
 }
 
 function escapeHtml(str) {
