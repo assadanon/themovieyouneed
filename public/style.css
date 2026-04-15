@@ -540,7 +540,20 @@ section { position: relative; z-index: 1; }
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative; /* anchors the connecting outline */
 }
+
+/* ── Connecting outline: links ghost card shell to expanded panel ─────────── */
+.rx-col-outline {
+  position: absolute;
+  border: 2px solid var(--outline-color, transparent);
+  border-radius: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 3;
+}
+.rx-col-outline.visible { opacity: 0.85; }
 
 /* Each row is a 3-column grid */
 .rx-row {
@@ -840,10 +853,9 @@ section { position: relative; z-index: 1; }
   opacity: 1;      /* prevent reverting to rx-card's base opacity:0 */
   pointer-events: none;
   cursor: default;
-  /* Coloured shell: clear tint + solid category-colour border */
-  background: color-mix(in srgb, var(--cat-color) 14%, transparent);
-  box-shadow: 0 0 0 2px var(--cat-color) !important;
-  transition: background 0.45s ease, box-shadow 0.45s ease;
+  /* Soft coloured tint — the outline (rx-col-outline) provides the border */
+  background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+  box-shadow: none !important;
 }
 
 /* Band stays fully visible — it's the identity label for what's open below */

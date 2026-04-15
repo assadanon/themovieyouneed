@@ -489,42 +489,91 @@ function renderResults({ profile, recommendations }) {
   let expandedIndex = null;
   let panelBusy     = false;
 
-  // Collapse a card's body down to just its band (smooth slide-up)
+  // ── Connecting outline (visually links ghost card to expanded panel) ──────
+  const connOutline = document.createElement('div');
+  connOutline.className = 'rx-col-outline';
+  grid.appendChild(connOutline);
+
+  function showOutline(i, panelTargetH) {
+    const catColor  = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
+    const gridRect  = grid.getBoundingClientRect();
+    const cardRect  = cards[i].getBoundingClientRect();
+    const panelRect = expandedPanel.getBoundingClientRect();
+    const totalH    = (panelRect.top - cardRect.top) + panelTargetH;
+
+    connOutline.style.setProperty('--outline-color', catColor);
+    connOutline.style.left   = (cardRect.left  - gridRect.left  - 4) + 'px';
+    connOutline.style.top    = (cardRect.top   - gridRect.top   - 4) + 'px';
+    connOutline.style.width  = (cardRect.width + 8) + 'px';
+    connOutline.style.height = (totalH         + 8) + 'px';
+    connOutline.classList.add('visible');
+  }
+
+  function hideOutline() {
+    connOutline.classList.remove('visible');
+  }
+
+  // ── Scroll so ghost card + panel are vertically centred in viewport ───────
+  function scrollToCenter(i, panelTargetH) {
+    const cardRect  = cards[i].getBoundingClientRect();
+    const panelRect = expandedPanel.getBoundingClientRect();
+    const topAbs    = cardRect.top  + window.scrollY;
+    const botAbs    = panelRect.top + window.scrollY + panelTargetH;
+    const target    = topAbs + (botAbs - topAbs) / 2 - window.innerHeight / 2;
+    window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+  }
+
+  // ── Soft fade-out then height-collapse ────────────────────────────────────
   function collapseCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
     const h = body.offsetHeight;
-    card.dataset.bodyH = h; // remember for the expand animation
-    // Remove flex:1 so explicit height wins, then animate to 0
-    body.style.flex       = 'none';
-    body.style.overflow   = 'hidden';
-    body.style.transition = 'none';
-    body.style.height     = h + 'px';
-    card.classList.add('card-selected');
-    // Double rAF ensures the painted start-height is committed before transition starts
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-      body.style.height     = '0px';
-    }));
+    card.dataset.bodyH = h;
+
+    // Step 1: fade content out softly
+    body.style.transition = 'opacity 0.3s ease';
+    body.style.opacity    = '0';
+
+    // Step 2: after fade, collapse height (flex:none lets explicit height win)
+    setTimeout(() => {
+      body.style.flex       = 'none';
+      body.style.overflow   = 'hidden';
+      body.style.transition = 'none';
+      body.style.height     = h + 'px';
+      body.style.opacity    = '1'; // reset so it doesn't interfere with expand
+      card.classList.add('card-selected');
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+        body.style.height     = '0px';
+      }));
+    }, 310);
   }
 
-  // Expand a card's body back to its original height (smooth slide-down)
+  // ── Height-expand then fade content back in ───────────────────────────────
   function expandCardBody(card) {
-    const body = card.querySelector('.card-body');
+    const body   = card.querySelector('.card-body');
     if (!body) return;
     const target = parseInt(card.dataset.bodyH, 10) || 0;
+
+    body.style.opacity    = '0';
     card.classList.remove('card-selected');
     body.style.transition = 'none';
     body.style.height     = '0px';
     requestAnimationFrame(() => requestAnimationFrame(() => {
       body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
       body.style.height     = target + 'px';
+      // After expand, fade content back in
       setTimeout(() => {
-        body.style.flex       = '';
-        body.style.height     = '';
-        body.style.overflow   = '';
-        body.style.transition = '';
-        delete card.dataset.bodyH;
+        body.style.transition = 'opacity 0.3s ease';
+        body.style.opacity    = '1';
+        setTimeout(() => {
+          body.style.flex       = '';
+          body.style.height     = '';
+          body.style.overflow   = '';
+          body.style.transition = '';
+          body.style.opacity    = '';
+          delete card.dataset.bodyH;
+        }, 320);
       }, 520);
     }));
   }
@@ -543,13 +592,21 @@ function renderResults({ profile, recommendations }) {
     expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
     wireCloseBtn();
 
-    // Animate height 0 → natural height (1.5s)
+    // Capture panel target height before animation starts
     expandedPanel.style.transition = 'none';
-    expandedPanel.style.height = '0px';
+    expandedPanel.style.height     = '0px';
     expandedPanel.getBoundingClientRect();
-    const target = expandedPanel.scrollHeight;
+    const panelTargetH = expandedPanel.scrollHeight;
+
+    // Animate panel open (1.5s)
     expandedPanel.style.transition = 'height 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
-    expandedPanel.style.height = target + 'px';
+    expandedPanel.style.height     = panelTargetH + 'px';
+
+    // Auto-scroll so the combined view is centred (let animation start first)
+    setTimeout(() => scrollToCenter(i, panelTargetH), 150);
+
+    // Show connecting outline once panel is mostly open
+    setTimeout(() => showOutline(i, panelTargetH), 1200);
 
     setTimeout(() => {
       expandedPanel.style.height = 'auto';
@@ -561,21 +618,27 @@ function renderResults({ profile, recommendations }) {
     const prev = expandedIndex;
     expandedIndex = i;
 
-    // Animate old card back, new card collapses
+    hideOutline();
     expandCardBody(cards[prev]);
     collapseCardBody(cards[i]);
 
     // Crossfade panel content
     const inner = expandedPanel.querySelector('.ep-inner');
-    if (inner) {
-      inner.style.opacity = '0';
-      setTimeout(() => {
-        expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
-        wireCloseBtn();
-      }, 200);
-    } else {
+    const updateContent = () => {
       expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
       wireCloseBtn();
+      // Re-show outline for new card after content settles
+      const panelTargetH = expandedPanel.scrollHeight;
+      setTimeout(() => {
+        scrollToCenter(i, panelTargetH);
+        showOutline(i, panelTargetH);
+      }, 400);
+    };
+    if (inner) {
+      inner.style.opacity = '0';
+      setTimeout(updateContent, 200);
+    } else {
+      updateContent();
     }
   }
 
@@ -585,19 +648,19 @@ function renderResults({ profile, recommendations }) {
     const prev = expandedIndex;
     expandedIndex = null;
 
-    // Expand the previously collapsed card back
+    hideOutline();
     if (prev !== null) expandCardBody(cards[prev]);
 
-    // Freeze panel height then animate to 0 (0.8s)
+    // Freeze then animate panel to 0 (0.8s)
     const h = expandedPanel.scrollHeight;
     expandedPanel.style.transition = 'none';
-    expandedPanel.style.height = h + 'px';
+    expandedPanel.style.height     = h + 'px';
     expandedPanel.getBoundingClientRect();
     expandedPanel.style.transition = 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
-    expandedPanel.style.height = '0px';
+    expandedPanel.style.height     = '0px';
 
     setTimeout(() => {
-      expandedPanel.innerHTML = '';
+      expandedPanel.innerHTML    = '';
       expandedPanel.style.transition = '';
       panelBusy = false;
     }, 820);
