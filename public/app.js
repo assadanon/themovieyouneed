@@ -499,13 +499,14 @@ function renderResults({ profile, recommendations }) {
     const gridRect  = grid.getBoundingClientRect();
     const cardRect  = cards[i].getBoundingClientRect();
     const panelRect = expandedPanel.getBoundingClientRect();
-    const totalH    = (panelRect.top - cardRect.top) + panelTargetH;
+    // Outline spans full grid width (= full panel width) from card top to panel bottom
+    const totalH = (panelRect.top - cardRect.top) + panelTargetH;
 
     connOutline.style.setProperty('--outline-color', catColor);
-    connOutline.style.left   = (cardRect.left  - gridRect.left  - 4) + 'px';
-    connOutline.style.top    = (cardRect.top   - gridRect.top   - 4) + 'px';
-    connOutline.style.width  = (cardRect.width + 8) + 'px';
-    connOutline.style.height = (totalH         + 8) + 'px';
+    connOutline.style.left   = '-4px';                          // full grid width
+    connOutline.style.top    = (cardRect.top - gridRect.top - 4) + 'px';
+    connOutline.style.width  = (gridRect.width + 8) + 'px';    // full grid width
+    connOutline.style.height = (totalH + 8) + 'px';
     connOutline.classList.add('visible');
   }
 
@@ -513,40 +514,46 @@ function renderResults({ profile, recommendations }) {
     connOutline.classList.remove('visible');
   }
 
-  // ── Scroll so ghost card + panel are vertically centred in viewport ───────
-  function scrollToCenter(i, panelTargetH) {
+  // ── Scroll so the ghost card + expanded panel are vertically centred ────────
+  // Called AFTER animation settles so getBoundingClientRect values are final.
+  // Row-0 cards (i<3): ghost is above panel → top = card top, bottom = panel bottom
+  // Row-1 cards (i≥3): panel is above ghost → top = panel top, bottom = card bottom
+  function scrollToCenter(i) {
     const cardRect  = cards[i].getBoundingClientRect();
     const panelRect = expandedPanel.getBoundingClientRect();
-    const topAbs    = cardRect.top  + window.scrollY;
-    const botAbs    = panelRect.top + window.scrollY + panelTargetH;
-    const target    = topAbs + (botAbs - topAbs) / 2 - window.innerHeight / 2;
-    window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    const topAbs = (i < 3 ? cardRect.top  : panelRect.top)    + window.scrollY;
+    const botAbs = (i < 3 ? panelRect.bottom : cardRect.bottom) + window.scrollY;
+    const midpoint = (topAbs + botAbs) / 2;
+    window.scrollTo({ top: Math.max(0, midpoint - window.innerHeight / 2), behavior: 'smooth' });
   }
 
-  // ── Soft fade-out then height-collapse ────────────────────────────────────
+  // ── Fade-out (content + band) + height-collapse ───────────────────────────
   function collapseCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
     const h = body.offsetHeight;
     card.dataset.bodyH = h;
 
-    // Step 1: fade content out softly
-    body.style.transition = 'opacity 0.3s ease';
+    // Apply card-selected immediately so background tint + band fade
+    // happen in sync with the content fade (not as a sudden jump afterwards)
+    card.classList.add('card-selected');
+
+    // Fade content out softly
+    body.style.transition = 'opacity 0.35s ease';
     body.style.opacity    = '0';
 
-    // Step 2: after fade, collapse height (flex:none lets explicit height win)
+    // After fade, collapse height (flex:none lets explicit height win)
     setTimeout(() => {
       body.style.flex       = 'none';
       body.style.overflow   = 'hidden';
       body.style.transition = 'none';
       body.style.height     = h + 'px';
       body.style.opacity    = '1'; // reset so it doesn't interfere with expand
-      card.classList.add('card-selected');
       requestAnimationFrame(() => requestAnimationFrame(() => {
         body.style.transition = 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
         body.style.height     = '0px';
       }));
-    }, 310);
+    }, 360);
   }
 
   // ── Height-expand then fade content back in ───────────────────────────────
@@ -602,15 +609,14 @@ function renderResults({ profile, recommendations }) {
     expandedPanel.style.transition = 'height 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
     expandedPanel.style.height     = panelTargetH + 'px';
 
-    // Auto-scroll so the combined view is centred (let animation start first)
-    setTimeout(() => scrollToCenter(i, panelTargetH), 150);
-
     // Show connecting outline once panel is mostly open
     setTimeout(() => showOutline(i, panelTargetH), 1200);
 
     setTimeout(() => {
       expandedPanel.style.height = 'auto';
       panelBusy = false;
+      // Scroll AFTER animation settles so positions are final
+      scrollToCenter(i);
     }, 1520);
   }
 
@@ -630,8 +636,8 @@ function renderResults({ profile, recommendations }) {
       // Re-show outline for new card after content settles
       const panelTargetH = expandedPanel.scrollHeight;
       setTimeout(() => {
-        scrollToCenter(i, panelTargetH);
         showOutline(i, panelTargetH);
+        scrollToCenter(i);
       }, 400);
     };
     if (inner) {

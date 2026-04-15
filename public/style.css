@@ -727,7 +727,8 @@ section { position: relative; z-index: 1; }
   opacity: 0;
   transform: translateY(14px);
   box-shadow: 0 0 0 1px var(--cat-color, transparent);
-  transition: box-shadow 0.2s ease;
+  /* background transitions so the tint fades in with the poster fade-out */
+  transition: box-shadow 0.2s ease, background 0.35s ease;
   position: relative;
 }
 
@@ -858,9 +859,10 @@ section { position: relative; z-index: 1; }
   box-shadow: none !important;
 }
 
-/* Band stays fully visible — it's the identity label for what's open below */
+/* Band fades out — the panel header already shows the category clearly */
 .rx-card.card-selected .card-band {
-  opacity: 1;
+  opacity: 0;
+  transition: opacity 0.35s ease;
 }
 
 /* ── Our Choice ──────────────────────────────────────────────────────────────*/
