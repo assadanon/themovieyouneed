@@ -50,6 +50,12 @@ const shareBtn          = document.getElementById('shareBtn');
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  // Preview shortcut — append ?preview to the URL to jump straight to mock results
+  if (new URLSearchParams(window.location.search).has('preview')) {
+    showPreviewResults();
+    return;
+  }
+
   try {
     const res = await fetch('/api/questions');
     questions = await res.json();
@@ -454,30 +460,118 @@ function renderResults({ profile, recommendations }) {
     return;
   }
 
-  // Sort by fit_percentage descending — highest match first
+  // Sort by fit_percentage descending
   const sorted = [...recommendations].sort((a, b) => b.fit_percentage - a.fit_percentage);
 
-  // 2×3 expandable grid
+  // ── Two-row + animated panel between them ──────────────────────────────────
   const grid = document.createElement('div');
   grid.className = 'rx-grid';
 
+  const row0 = document.createElement('div');
+  row0.className = 'rx-row';
+
+  const expandedPanel = document.createElement('div');
+  expandedPanel.className = 'rx-expanded-panel';
+
+  const row1 = document.createElement('div');
+  row1.className = 'rx-row';
+
   const cards = sorted.map(rec => createMovieCard(rec));
-  cards.forEach(card => grid.appendChild(card));
+  cards.slice(0, 3).forEach(c => row0.appendChild(c));
+  cards.slice(3, 6).forEach(c => row1.appendChild(c));
+
+  grid.appendChild(row0);
+  grid.appendChild(expandedPanel);
+  grid.appendChild(row1);
   recommendationsEl.appendChild(grid);
 
-  // Wire up expansion
-  cards.forEach((card, i) => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.card-tmdb-link') || e.target.closest('.card-close-btn')) return;
-      toggleCardExpand(i, cards, grid);
-    });
-    const closeBtn = card.querySelector('.card-close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        collapseAllCards(cards);
-      });
+  // ── Expansion state ──────────────────────────────────────────────────────
+  let expandedIndex = null;
+  let panelBusy     = false;
+
+  function wireCloseBtn() {
+    const btn = expandedPanel.querySelector('.ep-close-btn');
+    if (btn) btn.addEventListener('click', e => { e.stopPropagation(); closePanel(); });
+  }
+
+  function openPanel(i) {
+    if (panelBusy) return;
+    panelBusy = true;
+    expandedIndex = i;
+    cards[i].classList.add('card-ghost');
+
+    expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
+    wireCloseBtn();
+
+    // Animate height 0 → natural height (1.5s)
+    expandedPanel.style.transition = 'none';
+    expandedPanel.style.height = '0px';
+    expandedPanel.getBoundingClientRect(); // force layout
+    const target = expandedPanel.scrollHeight;
+    expandedPanel.style.transition = 'height 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+    expandedPanel.style.height = target + 'px';
+
+    setTimeout(() => {
+      expandedPanel.style.height = 'auto';
+      panelBusy = false;
+    }, 1520);
+  }
+
+  function switchCard(i) {
+    const prev = expandedIndex;
+    expandedIndex = i;
+
+    // Swap ghosts
+    cards[prev].classList.remove('card-ghost');
+    cards[i].classList.add('card-ghost');
+
+    // Crossfade panel content
+    const inner = expandedPanel.querySelector('.ep-inner');
+    if (inner) {
+      inner.style.opacity = '0';
+      setTimeout(() => {
+        expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
+        wireCloseBtn();
+      }, 200);
+    } else {
+      expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
+      wireCloseBtn();
     }
+  }
+
+  function closePanel() {
+    if (panelBusy) return;
+    panelBusy = true;
+    const prev = expandedIndex;
+    expandedIndex = null;
+
+    // Freeze at current height then animate to 0 (0.8s)
+    const h = expandedPanel.scrollHeight;
+    expandedPanel.style.transition = 'none';
+    expandedPanel.style.height = h + 'px';
+    expandedPanel.getBoundingClientRect();
+    expandedPanel.style.transition = 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+    expandedPanel.style.height = '0px';
+
+    setTimeout(() => {
+      if (prev !== null) cards[prev].classList.remove('card-ghost');
+      expandedPanel.innerHTML = '';
+      expandedPanel.style.transition = '';
+      panelBusy = false;
+    }, 820);
+  }
+
+  cards.forEach((card, i) => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.card-tmdb-link')) return;
+      if (i === expandedIndex) {
+        closePanel();
+      } else if (expandedIndex !== null) {
+        switchCard(i);
+      } else {
+        openPanel(i);
+      }
+    });
   });
 
   // Staggered reveal
@@ -486,9 +580,7 @@ function renderResults({ profile, recommendations }) {
   });
 
   // Our choice — highest fit_percentage
-  const best = recommendations.reduce((a, b) =>
-    a.fit_percentage > b.fit_percentage ? a : b
-  );
+  const best = recommendations.reduce((a, b) => a.fit_percentage > b.fit_percentage ? a : b);
   const cat = CATEGORIES[best.category] || { shortName: best.category, color: 'var(--white)' };
   ourChoiceEl.innerHTML =
     `our choice this time is ` +
@@ -500,58 +592,47 @@ function renderResults({ profile, recommendations }) {
   }, 200);
 }
 
-function collapseAllCards(cards) {
-  cards.forEach(c => {
-    c.classList.remove('card-expanded');
-    c.style.gridColumn = '';
-    c.style.gridRow = '';
-  });
+// ── Build expanded panel HTML ─────────────────────────────────────────────────
+function buildExpandedHTML(rec) {
+  const cat = CATEGORIES[rec.category] || {};
+  const actorsLine = (rec.actors || []).join(' · ');
+  const crewLine = [
+    rec.director ? `<span class="crew-dir">dir.</span> ${escapeHtml(rec.director)}` : '',
+    actorsLine   ? escapeHtml(actorsLine) : '',
+  ].filter(Boolean).join('<span class="crew-sep"> · </span>');
+
+  const runtimeText = rec.runtime ? `${rec.runtime} min` : '';
+  const tmdbUrl     = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;
+
+  const posterHTML = rec.poster
+    ? `<img src="${rec.poster}" alt="${escapeHtml(rec.title)}" loading="lazy">`
+    : `<div class="poster-placeholder">🎬</div>`;
+
+  return `
+    <div class="ep-inner" style="--cat-color:${cat.color || 'var(--bg3)'}">
+      <div class="ep-band" style="background:${cat.color || 'var(--bg3)'}">
+        <span class="ep-cat-name">${escapeHtml(cat.label || rec.category)}</span>
+        <button class="ep-close-btn" aria-label="Close">×</button>
+      </div>
+      <div class="ep-body">
+        <div class="ep-poster">${posterHTML}</div>
+        <div class="ep-details">
+          <div class="ep-title">${escapeHtml(rec.title)}<span class="ep-year"> (${rec.year})</span></div>
+          <div class="ep-crew">${crewLine}</div>
+          ${rec.why_this_film ? `<p class="ep-why">${escapeHtml(rec.why_this_film)}</p>` : ''}
+          ${rec.synopsis      ? `<p class="ep-synopsis">${escapeHtml(rec.synopsis)}</p>` : ''}
+          <div class="ep-meta">
+            ${runtimeText  ? `<span class="ep-runtime">⏱ ${runtimeText}</span>` : ''}
+            <span class="ep-fit">${rec.fit_percentage}% resonance</span>
+            ${rec.tmdb_id  ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
-function toggleCardExpand(cardIndex, cards, grid) {
-  const wasExpanded = cards[cardIndex].classList.contains('card-expanded');
-  collapseAllCards(cards);
-  if (!wasExpanded) {
-    doExpandCard(cardIndex, cards);
-    setTimeout(() => cards[cardIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
-  }
-}
-
-function doExpandCard(cardIndex, cards) {
-  const card = cards[cardIndex];
-  const row  = Math.floor(cardIndex / 3); // 0 or 1
-  const col  = cardIndex % 3;
-
-  card.classList.add('card-expanded');
-  card.style.gridColumn = '1 / -1';
-
-  if (row === 0) {
-    // Expanded card in row 1
-    card.style.gridRow = '1';
-    // Other row-0 cards → row 2
-    const othersR0 = [0, 1, 2].filter(j => j !== col);
-    othersR0.forEach((origCol, k) => {
-      if (cards[origCol]) { cards[origCol].style.gridRow = '2'; cards[origCol].style.gridColumn = String(k + 1); }
-    });
-    // Row-1 cards → row 3
-    [3, 4, 5].forEach((j, k) => {
-      if (cards[j]) { cards[j].style.gridRow = '3'; cards[j].style.gridColumn = String(k + 1); }
-    });
-  } else {
-    // Row-0 cards stay at row 1
-    [0, 1, 2].forEach((j, k) => {
-      if (cards[j]) { cards[j].style.gridRow = '1'; cards[j].style.gridColumn = String(k + 1); }
-    });
-    // Expanded card in row 2
-    card.style.gridRow = '2';
-    // Other row-1 cards → row 3
-    const othersR1 = [3, 4, 5].filter(j => j !== cardIndex);
-    othersR1.forEach((j, k) => {
-      if (cards[j]) { cards[j].style.gridRow = '3'; cards[j].style.gridColumn = String(k + 1); }
-    });
-  }
-}
-
+// ── Create collapsed card (thumbnail + category band) ─────────────────────────
 function createMovieCard(movie) {
   const cat  = CATEGORIES[movie.category] || {};
   const card = document.createElement('div');
@@ -565,34 +646,85 @@ function createMovieCard(movie) {
   const actorsLine = (movie.actors || []).join(' · ');
   const crewLine   = [
     movie.director ? `<span class="crew-dir">dir.</span> ${escapeHtml(movie.director)}` : '',
-    actorsLine ? escapeHtml(actorsLine) : '',
+    actorsLine     ? escapeHtml(actorsLine) : '',
   ].filter(Boolean).join('<span class="crew-sep"> · </span>');
 
-  const runtimeText  = movie.runtime ? `${movie.runtime} min` : '';
-  const tmdbUrl      = `https://www.themoviedb.org/movie/${movie.tmdb_id}`;
-  const whyText      = movie.why_this_film || '';
-  const synopsisText = movie.synopsis || '';
-
   card.innerHTML = `
+    <div class="card-band" style="background:${cat.color || 'var(--bg3)'}">
+      <span class="card-band-label">${escapeHtml(cat.label || movie.category)}</span>
+    </div>
     <div class="card-poster-wrap">${posterHTML}</div>
     <div class="card-content">
-      <div class="card-category-label">${escapeHtml(cat.label || movie.category)}</div>
       <div class="card-title">${escapeHtml(movie.title)}<span class="card-year"> (${movie.year})</span></div>
       <div class="card-crew">${crewLine}</div>
-      <div class="card-expandable">
-        ${whyText      ? `<p class="card-why">${escapeHtml(whyText)}</p>` : ''}
-        ${synopsisText ? `<p class="card-synopsis">${escapeHtml(synopsisText)}</p>` : ''}
-        <div class="card-meta">
-          ${runtimeText         ? `<span class="card-runtime">⏱ ${runtimeText}</span>` : ''}
-          ${movie.tmdb_id       ? `<a class="card-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
-        </div>
-      </div>
       <span class="fit-badge">${movie.fit_percentage}% resonance</span>
     </div>
-    <button class="card-close-btn" aria-label="Close">×</button>
   `;
 
   return card;
+}
+
+// ── Preview shortcut (dev only — visit ?preview) ──────────────────────────────
+function showPreviewResults() {
+  logoWrap.classList.add('shrunk');
+  landing.classList.add('hidden');
+  renderResults({
+    profile: {
+      psychological_state: 'contemplative restlessness with a hunger for narrative depth',
+      core_need: 'You need a film that mirrors your inner search for meaning while offering escape from the mundane — something that challenges without exhausting.',
+    },
+    recommendations: [
+      {
+        category: 'popular', title: 'Inception', year: 2010,
+        director: 'Christopher Nolan',
+        actors: ['Leonardo DiCaprio', 'Joseph Gordon-Levitt', 'Elliot Page'],
+        synopsis: 'A thief who steals corporate secrets through dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.',
+        why_this_film: 'Your hunger for layered, cerebral narratives makes this architecture of dreams a perfect prescription.',
+        fit_percentage: 94, runtime: 148, tmdb_id: 27205,
+        poster: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
+      },
+      {
+        category: 'indie', title: 'Eternal Sunshine of the Spotless Mind', year: 2004,
+        director: 'Michel Gondry', actors: ['Jim Carrey', 'Kate Winslet'],
+        synopsis: 'When their relationship turns sour, a couple undergoes a medical procedure to have each other erased from their memories.',
+        why_this_film: 'A hidden gem that captures emotional truth in ways mainstream cinema rarely achieves.',
+        fit_percentage: 88, runtime: 108, tmdb_id: 38,
+        poster: 'https://image.tmdb.org/t/p/w500/5MwkWH9tYHv3mV9OiQ0ZhjR2411.jpg',
+      },
+      {
+        category: 'animation', title: 'Spirited Away', year: 2001,
+        director: 'Hayao Miyazaki', actors: ['Daveigh Chase', 'Suzanne Pleshette'],
+        synopsis: 'A young girl wanders into a world ruled by gods, witches, and spirits, where humans are changed into beasts.',
+        why_this_film: 'This animated masterpiece speaks to the part of you yearning for wonder and transformation.',
+        fit_percentage: 85, runtime: 125, tmdb_id: 129,
+        poster: 'https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg',
+      },
+      {
+        category: 'classic', title: 'Vertigo', year: 1958,
+        director: 'Alfred Hitchcock', actors: ['James Stewart', 'Kim Novak'],
+        synopsis: 'A retired detective becomes obsessed with a woman he has been hired to follow, drawn into a labyrinth of identity and desire.',
+        why_this_film: 'A hall of fame classic resonating with your psychological depth and appetite for unresolved tension.',
+        fit_percentage: 82, runtime: 128, tmdb_id: 426,
+        poster: 'https://image.tmdb.org/t/p/w500/3DqDMZJzelNG2mGVvIQfsiL0LZB.jpg',
+      },
+      {
+        category: 'world_cinema', title: 'Parasite', year: 2019,
+        director: 'Bong Joon-ho', actors: ['Song Kang-ho', 'Lee Sun-kyun', 'Cho Yeo-jeong'],
+        synopsis: 'Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.',
+        why_this_film: "World cinema at its most precise — this film's social architecture speaks directly to your current worldview.",
+        fit_percentage: 79, runtime: 132, tmdb_id: 496243,
+        poster: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+      },
+      {
+        category: 'short', title: 'Lost in Translation', year: 2003,
+        director: 'Sofia Coppola', actors: ['Bill Murray', 'Scarlett Johansson'],
+        synopsis: 'A faded movie star and a neglected young woman form an unlikely bond after crossing paths in Tokyo.',
+        why_this_film: 'At 102 minutes, this quiet film says more in its silences than most epics say in three hours.',
+        fit_percentage: 76, runtime: 102, tmdb_id: 196,
+        poster: 'https://image.tmdb.org/t/p/w500/sQBBgWEd0VPLUJjjDRCoCB0SKjf.jpg',
+      },
+    ],
+  });
 }
 
 function escapeHtml(str) {
