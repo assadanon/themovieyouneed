@@ -543,17 +543,19 @@ section { position: relative; z-index: 1; }
   position: relative; /* anchors the connecting outline */
 }
 
-/* ── Connecting outline: links ghost card shell to expanded panel ─────────── */
-.rx-col-outline {
+/* ── L-stroke: two animated bars connecting ghost card shell to panel ──────── */
+/* Vertical stem + horizontal foot form an L (ghost above) or ⌐ (ghost below)  */
+.rx-stroke {
   position: absolute;
-  border: 2px solid var(--outline-color, transparent);
-  border-radius: 12px;
+  background: var(--stroke-color, var(--text-dim));
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.4s ease;
-  z-index: 3;
+  border-radius: 3px;
+  z-index: 4;
+  box-shadow: 0 0 8px 1px var(--stroke-color, transparent);
 }
-.rx-col-outline.visible { opacity: 0.85; }
+.rx-stroke-v { width: 3px; height: 0; }
+.rx-stroke-h { height: 3px; width:  0; }
 
 /* Each row is a 3-column grid */
 .rx-row {
@@ -569,13 +571,12 @@ section { position: relative; z-index: 1; }
   border-radius: 10px;
 }
 
-/* Panel inner wrapper */
+/* Panel inner wrapper — opacity is controlled by JS for the reveal sequence */
 .ep-inner {
   background: var(--bg2);
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
-  transition: opacity 0.2s ease;
 }
 
 /* Coloured category band across the top of the panel */
@@ -769,7 +770,7 @@ section { position: relative; z-index: 1; }
 /* ── Card category band (MD3-inspired coloured header) ───────────────────── */
 .card-band {
   width: 100%;
-  padding: 0.55rem 0.9rem;
+  padding: 0.7rem 0.9rem;
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -780,9 +781,9 @@ section { position: relative; z-index: 1; }
 
 .card-band-label {
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: #0d1f33;
   line-height: 1;

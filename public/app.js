@@ -489,29 +489,21 @@ function renderResults({ profile, recommendations }) {
   let expandedIndex = null;
   let panelBusy     = false;
 
-  // ── Connecting outline (visually links ghost card to expanded panel) ──────
-  const connOutline = document.createElement('div');
-  connOutline.className = 'rx-col-outline';
-  grid.appendChild(connOutline);
-
-  function showOutline(i, panelTargetH) {
-    const catColor  = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
-    const gridRect  = grid.getBoundingClientRect();
-    const cardRect  = cards[i].getBoundingClientRect();
-    const panelRect = expandedPanel.getBoundingClientRect();
-    // Outline spans full grid width (= full panel width) from card top to panel bottom
-    const totalH = (panelRect.top - cardRect.top) + panelTargetH;
-
-    connOutline.style.setProperty('--outline-color', catColor);
-    connOutline.style.left   = '-4px';                          // full grid width
-    connOutline.style.top    = (cardRect.top - gridRect.top - 4) + 'px';
-    connOutline.style.width  = (gridRect.width + 8) + 'px';    // full grid width
-    connOutline.style.height = (totalH + 8) + 'px';
-    connOutline.classList.add('visible');
-  }
+  // ── L-stroke: vertical stem + horizontal foot ────────────────────────────
+  const connV = document.createElement('div');
+  connV.className = 'rx-stroke rx-stroke-v';
+  const connH = document.createElement('div');
+  connH.className = 'rx-stroke rx-stroke-h';
+  grid.appendChild(connV);
+  grid.appendChild(connH);
 
   function hideOutline() {
-    connOutline.classList.remove('visible');
+    connV.style.transition = 'opacity 0.25s ease, height 0.25s ease';
+    connH.style.transition = 'opacity 0.25s ease, width 0.25s ease';
+    connV.style.opacity    = '0';
+    connH.style.opacity    = '0';
+    connV.style.height     = '0px';
+    connH.style.width      = '0px';
   }
 
   // ── Scroll so the ghost card + expanded panel are vertically centred ────────
@@ -594,62 +586,90 @@ function renderResults({ profile, recommendations }) {
     if (panelBusy) return;
     panelBusy = true;
     expandedIndex = i;
+
+    // ── Phase 1: ghost card fades ──────────────────────────────────────────────
     collapseCardBody(cards[i]);
 
     expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
     wireCloseBtn();
 
-    // Capture panel target height before animation starts
+    const epInner = expandedPanel.querySelector('.ep-inner');
+    if (epInner) { epInner.style.opacity = '0'; epInner.style.transition = 'none'; }
+
+    // Measure everything NOW (synchronous) so stroke positions are accurate
+    // and we can use flat (non-nested) timers for the animation — avoids
+    // background-tab nested-timer throttle (Chrome floors nested delays to ~1s)
     expandedPanel.style.transition = 'none';
     expandedPanel.style.height     = '0px';
     expandedPanel.getBoundingClientRect();
     const panelTargetH = expandedPanel.scrollHeight;
 
-    // Animate panel open (1.5s)
+    const catColor    = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
+    const gridRect    = grid.getBoundingClientRect();
+    const cardRect    = cards[i].getBoundingClientRect();
+    const panelRect   = expandedPanel.getBoundingClientRect();
+    const bandH       = cards[i].querySelector('.card-band')?.offsetHeight || 40;
+    const cardRelTop  = cardRect.top  - gridRect.top;
+    const cardRelLeft = cardRect.left - gridRect.left;
+    const panelRelTop = panelRect.top - gridRect.top;
+    const gridW       = gridRect.width;
+
+    let vTop, vHeight, hTop;
+    if (i < 3) {
+      vTop    = cardRelTop;
+      vHeight = panelRelTop + panelTargetH - cardRelTop;
+      hTop    = panelRelTop + panelTargetH;
+    } else {
+      const ghostFinalTop = panelRelTop + panelTargetH + 12;
+      vTop    = panelRelTop;
+      vHeight = ghostFinalTop + bandH - panelRelTop;
+      hTop    = ghostFinalTop + bandH;
+    }
+    const vLeft = cardRelLeft - 2;
+    const hMaxW = gridW - cardRelLeft + 4;
+
+    // Snap strokes to start position (invisible, no height/width yet)
+    connV.style.cssText = `position:absolute; left:${vLeft}px; top:${vTop - 2}px; width:3px; height:0px; opacity:0; border-radius:3px; z-index:4; background:${catColor}; box-shadow:0 0 8px 1px ${catColor}; pointer-events:none;`;
+    connH.style.cssText = `position:absolute; left:${vLeft}px; top:${hTop + 1}px; height:3px; width:0px; opacity:0; border-radius:3px; z-index:4; background:${catColor}; box-shadow:0 0 8px 1px ${catColor}; pointer-events:none;`;
+    connV.getBoundingClientRect(); // commit start state
+
+    // ── Phase 2: panel expands ─────────────────────────────────────────────────
     expandedPanel.style.transition = 'height 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
     expandedPanel.style.height     = panelTargetH + 'px';
 
-    // Show connecting outline once panel is mostly open
-    setTimeout(() => showOutline(i, panelTargetH), 1200);
+    // ── Phase 2 (parallel): L stroke draws — FLAT timers, no nesting ──────────
+    // Vertical stem after card-fade (~416ms). Flat timer avoids background throttle.
+    setTimeout(() => {
+      connV.style.transition = 'height 0.85s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease';
+      connV.style.opacity    = '0.85';
+      connV.style.height     = (vHeight + 4) + 'px';
+    }, 416);
+
+    // Horizontal foot at 416 + 680 = 1096ms — still flat (1096 > 1000ms floor)
+    setTimeout(() => {
+      connH.style.transition = 'width 0.45s ease, opacity 0.25s ease';
+      connH.style.opacity    = '0.85';
+      connH.style.width      = hMaxW + 'px';
+    }, 1096);
+
+    // ── Phase 3: content fades in as stroke completes ─────────────────────────
+    setTimeout(() => {
+      if (epInner) {
+        epInner.style.transition = 'opacity 0.5s ease';
+        epInner.style.opacity    = '1';
+      }
+    }, 1100);
 
     setTimeout(() => {
       expandedPanel.style.height = 'auto';
       panelBusy = false;
-      // Scroll AFTER animation settles so positions are final
       scrollToCenter(i);
     }, 1520);
   }
 
-  function switchCard(i) {
-    const prev = expandedIndex;
-    expandedIndex = i;
-
-    hideOutline();
-    expandCardBody(cards[prev]);
-    collapseCardBody(cards[i]);
-
-    // Crossfade panel content
-    const inner = expandedPanel.querySelector('.ep-inner');
-    const updateContent = () => {
-      expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
-      wireCloseBtn();
-      // Re-show outline for new card after content settles
-      const panelTargetH = expandedPanel.scrollHeight;
-      setTimeout(() => {
-        showOutline(i, panelTargetH);
-        scrollToCenter(i);
-      }, 400);
-    };
-    if (inner) {
-      inner.style.opacity = '0';
-      setTimeout(updateContent, 200);
-    } else {
-      updateContent();
-    }
-  }
-
-  function closePanel() {
-    if (panelBusy) return;
+  // onDone callback fires after close animation settles (used for sequential open)
+  function closePanel(onDone) {
+    if (panelBusy) { if (onDone) onDone(); return; }
     panelBusy = true;
     const prev = expandedIndex;
     expandedIndex = null;
@@ -666,9 +686,10 @@ function renderResults({ profile, recommendations }) {
     expandedPanel.style.height     = '0px';
 
     setTimeout(() => {
-      expandedPanel.innerHTML    = '';
+      expandedPanel.innerHTML        = '';
       expandedPanel.style.transition = '';
       panelBusy = false;
+      if (onDone) onDone();
     }, 820);
   }
 
@@ -678,7 +699,8 @@ function renderResults({ profile, recommendations }) {
       if (i === expandedIndex) {
         closePanel();
       } else if (expandedIndex !== null) {
-        switchCard(i);
+        // Close current card first, then open the new one
+        closePanel(() => openPanel(i));
       } else {
         openPanel(i);
       }
