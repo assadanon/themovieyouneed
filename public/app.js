@@ -578,6 +578,10 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
+    // For row1 ghost cards the panel's BOTTOM must also be flush with row1.
+    // CSS handles the top gap; JS handles the bottom gap for row1 cards.
+    if (i >= 3) expandedPanel.style.marginBottom = '-10px';
+
     // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
     // The card's "snap" came from scroll firing 1+ second after the panel grew.
     // Fix: pre-calculate the scroll target using panel.top (stable; doesn't depend
@@ -673,6 +677,7 @@ function renderResults({ profile, recommendations }) {
       expandedPanel.innerHTML        = '';
       expandedPanel.style.transition = '';
       expandedPanel.style.willChange = '';
+      expandedPanel.style.marginBottom = ''; // clear row1-ghost bottom-flush margin
       panelBusy = false;
       if (onDone) onDone();
     }, 820);

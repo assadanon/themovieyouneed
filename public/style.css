@@ -558,6 +558,10 @@ section { position: relative; z-index: 1; }
   overflow: hidden;
   height: 0;
   border-radius: 10px;
+  /* Pull panel up by the grid gap so it sits flush against the ghost card above.
+     When panel is closed (h=0) the math still gives 10px row-to-row spacing:
+     gap(10) + margin-top(-10) = 0 before panel, then gap(10) after = 10px total. */
+  margin-top: -10px;
 }
 
 /* Panel inner wrapper — opacity is controlled by JS for the reveal sequence */
