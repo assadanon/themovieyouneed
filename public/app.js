@@ -540,25 +540,42 @@ function renderResults({ profile, recommendations }) {
     requestAnimationFrame(step);
   }
 
-  // ── Fade-out (content + band) ─────────────────────────────────────────────
+  // ── Fade-out then collapse ────────────────────────────────────────────────
   function collapseCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
-    // Fade content out — card keeps its full height (no wipe, no layout shift)
+    // Phase 1: fade out content
     body.style.transition = 'opacity 0.4s ease';
     body.style.opacity    = '0';
-    // Background tint fades in via CSS transition: background 0.35s on .rx-card
     card.classList.add('card-selected');
+    // Phase 2: collapse height — starts at T=420ms, safely after the T=380ms
+    // scroll-target measurement (so panelTopAbs is read while the card is still
+    // full-height and the layout hasn't shifted yet).
+    setTimeout(() => {
+      const h = body.offsetHeight;
+      body.style.overflow   = 'hidden';
+      body.style.height     = h + 'px';
+      body.getBoundingClientRect();            // flush before transition
+      body.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+      body.style.height     = '0px';
+    }, 420);
   }
 
-  // ── Restore card — fade content back in ──────────────────────────────────
+  // ── Restore: expand height then fade content back in ─────────────────────
   function expandCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
-    // Restore card to normal state — fade content back in
     card.classList.remove('card-selected');
-    body.style.transition = 'opacity 0.35s ease';
-    body.style.opacity    = '1';
+    // Clear collapsed state so card snaps back to natural height
+    body.style.transition = '';
+    body.style.height     = '';
+    body.style.overflow   = '';
+    // Then fade content back in
+    body.style.opacity    = '0';
+    requestAnimationFrame(() => {
+      body.style.transition = 'opacity 0.35s ease';
+      body.style.opacity    = '1';
+    });
     setTimeout(() => {
       body.style.transition = '';
       body.style.opacity    = '';
