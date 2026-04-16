@@ -578,34 +578,32 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // ── Phase 2 (T=380ms): panel expands after ghost fade settles ─────────────
-    // Instead of animating panel height (which triggers layout recalc every frame),
-    // we snap the panel to full height instantly and animate row1 via transform —
-    // GPU-composited, so the movement is genuinely smooth with no layout per frame.
+    // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
+    // The card's "snap" came from scroll firing 1+ second after the panel grew.
+    // Fix: pre-calculate the scroll target using panel.top (stable; doesn't depend
+    // on panel height) + known panelTargetH, then fire scroll and height animation
+    // at exactly the same moment so the card position and viewport drift together.
     setTimeout(() => {
-      // Snap panel to full height with no transition (no jank from height anim)
-      expandedPanel.style.transition = 'none';
-      expandedPanel.style.height     = panelTargetH + 'px';
+      // panel.top is the bottom of row0 regardless of panel height — stable anchor
+      const panelTopAbs  = expandedPanel.getBoundingClientRect().top + window.scrollY;
+      const panelFinalMid = panelTopAbs + panelTargetH / 2;
+      const scrollTarget  = panelTargetH >= window.innerHeight
+        ? panelTopAbs - 24
+        : panelFinalMid - window.innerHeight / 2;
 
-      // Offset row1 visually back to where it was before the panel pushed it down
-      row1.style.willChange = 'transform';
-      row1.style.transition = 'none';
-      row1.style.transform  = `translateY(-${panelTargetH}px)`;
+      // Height animation: panel grows 0→full, pushing row1 down organically.
+      // Row1 ghost card is carried along by the layout — no translate juggling.
+      expandedPanel.style.willChange = 'height';
+      expandedPanel.style.transition = `height 1.3s cubic-bezier(0.76, 0, 0.24, 1)`;
+      expandedPanel.getBoundingClientRect(); // flush height=0 before transition
+      expandedPanel.style.height = panelTargetH + 'px';
 
-      // Flush: commits both changes atomically before we start the animation
-      row1.getBoundingClientRect();
-
-      // Animate row1 sliding down to its natural position — GPU composited
-      row1.style.transition = `transform 1.0s cubic-bezier(0.65, 0, 0.35, 1)`;
-      row1.style.transform  = 'translateY(0)';
-
-      // Scroll second — panel is already at full height so measurement is
-      // accurate, and smooth scroll happens in parallel with the row1 animation
-      scrollToCenter();
+      // Scroll at the exact same moment — card position and viewport move together
+      window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
     }, 380);
 
-    // ── T=1480ms: measure live positions, build rounded perimeter, fade in ─────
-    // Row1 transform done at 380+1000=1380ms; measure 100ms later when settled
+    // ── T=1780ms: measure live positions, build rounded perimeter, fade in ─────
+    // Height anim done at 380+1300=1680ms; measure 100ms later when settled
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
       const cardRect2 = cards[i].getBoundingClientRect();
@@ -634,24 +632,22 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
-    }, 1480);
+    }, 1780);
 
-    // ── T=1580ms: panel content fades in ──────────────────────────────────────
+    // ── T=1880ms: panel content fades in ──────────────────────────────────────
     setTimeout(() => {
       if (epInner) {
         epInner.style.transition = 'opacity 0.5s ease';
         epInner.style.opacity    = '1';
       }
-    }, 1580);
+    }, 1880);
 
-    // ── T=1750ms: unlock; clean up row1 transform + panel height ──────────────
+    // ── T=2100ms: unlock + set height auto ────────────────────────────────────
     setTimeout(() => {
-      expandedPanel.style.height = 'auto';
-      row1.style.transition  = '';
-      row1.style.transform   = '';
-      row1.style.willChange  = '';
+      expandedPanel.style.height     = 'auto';
+      expandedPanel.style.willChange = '';
       panelBusy = false;
-    }, 1750);
+    }, 2100);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)
@@ -890,17 +886,15 @@ function refreshPoster(img) {
       if (d?.poster) {
         img.src = d.poster;
       } else {
-        // Replace broken img with emoji placeholder
+        // Replace with a properly-sized blank poster (no icon — same dims as real poster)
         const ph = document.createElement('div');
-        ph.className = 'poster-placeholder';
-        ph.textContent = '🎬';
+        ph.className = 'poster-placeholder poster-blank';
         img.replaceWith(ph);
       }
     })
     .catch(() => {
       const ph = document.createElement('div');
-      ph.className = 'poster-placeholder';
-      ph.textContent = '🎬';
+      ph.className = 'poster-placeholder poster-blank';
       img.replaceWith(ph);
     });
 }
