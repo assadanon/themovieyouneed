@@ -1,6 +1,6 @@
 // ── Categories ────────────────────────────────────────────────────────────────
 const CATEGORIES = {
-  popular:      { label: 'The Popular Choice',           shortName: 'popular',       color: '#f4a7b9' },
+  popular:      { label: 'The Mainstream Choice',        shortName: 'mainstream',    color: '#f4a7b9' },
   indie:        { label: 'The Hidden Gem',                shortName: 'hidden gem',    color: '#4dd0e1' },
   animation:    { label: 'The Animated One',              shortName: 'animated',      color: '#7ecba8' },
   classic:      { label: 'The Hall of Fame Choice',       shortName: 'hall of fame',  color: '#c9d4db' },
@@ -16,6 +16,7 @@ let userAge = 25;
 let lastResults = null; // stored for image export
 
 // ── DOM Refs ──────────────────────────────────────────────────────────────────
+const mobileHeader      = document.getElementById('mobileHeader');
 const logoWrap          = document.getElementById('logoWrap');
 const logoLine1         = logoWrap.querySelector('.logo-line1');
 const logoLine2         = logoWrap.querySelector('.logo-line2');
@@ -373,7 +374,7 @@ revealBtn.addEventListener('click', () => {
     // Give the DOM one frame to unhide the element, then scroll to page bottom
     // so the full profile reveal (and footer) is always visible
     requestAnimationFrame(() => {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      easedScrollTo(document.body.scrollHeight, 700);
     });
   }
 });
@@ -386,6 +387,7 @@ function goHome() {
   quizSection.classList.add('hidden');
   loadingSection.classList.add('hidden');
   resultsSection.classList.add('hidden');
+  mobileHeader.classList.add('hidden');
   onboardingSection.classList.add('hidden');
   answers = Array(questions.length || 10).fill(null);
   currentQuestion = 0;
@@ -452,6 +454,7 @@ function renderResults({ profile, recommendations }) {
   lastResults = { profile, recommendations };
   loadingSection.classList.add('hidden');
   resultsSection.classList.remove('hidden');
+  mobileHeader.classList.remove('hidden'); // show sticky logo on mobile
 
   profileReveal.classList.add('hidden');
   ourChoiceEl.classList.add('hidden');
@@ -515,15 +518,23 @@ function renderResults({ profile, recommendations }) {
   // ── Scroll so the expanded panel is vertically centred in the viewport ───────
   // Centers the panel (the main content), letting the ghost card sit above/below.
   // If the panel alone is taller than the viewport, pin its top with a margin.
-  function scrollToCenter() {
-    const panelRect  = expandedPanel.getBoundingClientRect();
-    const topAbs     = panelRect.top    + window.scrollY;
-    const botAbs     = panelRect.bottom + window.scrollY;
-    const panelMid   = (topAbs + botAbs) / 2;
-    const scroll = panelRect.height >= window.innerHeight
-      ? topAbs - 24
-      : panelMid - window.innerHeight / 2;
-    window.scrollTo({ top: Math.max(0, scroll), behavior: 'smooth' });
+  // Custom eased scroll — gives full control over duration and curve,
+  // unlike browser smooth-scroll which is fast and linear-ish.
+  function easedScrollTo(targetY, duration = 950) {
+    const startY    = window.scrollY;
+    const distance  = targetY - startY;
+    if (Math.abs(distance) < 2) return;
+    const startTime = performance.now();
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+    function step(now) {
+      const elapsed  = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      window.scrollTo(0, startY + distance * easeInOutCubic(progress));
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
 
   // ── Fade-out (content + band) ─────────────────────────────────────────────
@@ -578,9 +589,10 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // For row1 ghost cards the panel's BOTTOM must also be flush with row1.
-    // CSS handles the top gap; JS handles the bottom gap for row1 cards.
-    if (i >= 3) expandedPanel.style.marginBottom = '-10px';
+    // Mark ghost card so CSS ::after/:before bridges the 10px flex gap
+    cards[i].classList.add(i < 3 ? 'ghost-top' : 'ghost-bottom');
+    // Square the panel corners that touch the ghost card
+    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '10px 10px 0 0';
 
     // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
     // The card's "snap" came from scroll firing 1+ second after the panel grew.
@@ -603,7 +615,7 @@ function renderResults({ profile, recommendations }) {
       expandedPanel.style.height = panelTargetH + 'px';
 
       // Scroll at the exact same moment — card position and viewport move together
-      window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+      easedScrollTo(Math.max(0, scrollTarget));
     }, 380);
 
     // ── T=1530ms: measure live positions, build rounded perimeter, fade in ─────
@@ -662,7 +674,11 @@ function renderResults({ profile, recommendations }) {
     expandedIndex = null;
 
     hideOutline();
-    if (prev !== null) expandCardBody(cards[prev]);
+    if (prev !== null) {
+      expandCardBody(cards[prev]);
+      cards[prev].classList.remove('ghost-top', 'ghost-bottom');
+    }
+    expandedPanel.style.borderRadius = '';
 
     // Freeze then animate panel to 0 (0.8s)
     const h = expandedPanel.scrollHeight;
@@ -677,7 +693,6 @@ function renderResults({ profile, recommendations }) {
       expandedPanel.innerHTML        = '';
       expandedPanel.style.transition = '';
       expandedPanel.style.willChange = '';
-      expandedPanel.style.marginBottom = ''; // clear row1-ghost bottom-flush margin
       panelBusy = false;
       if (onDone) onDone();
     }, 820);
@@ -719,10 +734,11 @@ function renderResults({ profile, recommendations }) {
 function buildExpandedHTML(rec) {
   const cat = CATEGORIES[rec.category] || {};
   const actorsLine = (rec.actors || []).join(' · ');
+  const actorsFormatted = (rec.actors || []).join(', ');
   const crewLine = [
-    rec.director ? `<span class="crew-dir">dir.</span> ${escapeHtml(rec.director)}` : '',
-    actorsLine   ? escapeHtml(actorsLine) : '',
-  ].filter(Boolean).join('<span class="crew-sep"> · </span>');
+    rec.director     ? `<span class="crew-dir">dir.</span> ${escapeHtml(rec.director)}` : '',
+    actorsFormatted  ? `<span class="crew-with">with:</span> ${escapeHtml(actorsFormatted)}` : '',
+  ].filter(Boolean).join('<span class="crew-sep"> | </span>');
 
   const runtimeText = rec.runtime ? `${rec.runtime} min` : '';
   const tmdbUrl     = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;

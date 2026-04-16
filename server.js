@@ -194,14 +194,22 @@ async function fetchIndiePool(kidMode = false) {
 }
 
 async function fetchAnimationPool(kidMode = false) {
-  // In kid mode broaden slightly (include live-action family films too)
   const genre = kidMode ? '10751|16' : '16';
-  const pages = randPages(3, 1, 7);
-  const results = await Promise.all(pages.map(p =>
-    tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=100&with_genres=${genre}&page=${p}`)
-      .then(d => filterMovies(d.results)).catch(() => [])
-  ));
-  return shuffle(results.flat()).slice(0, 18);
+  // Fetch global pool (may be anime-heavy) + explicitly non-Japanese pool, then mix.
+  // This prevents the category from being dominated by Studio Ghibli / anime alone.
+  const [globalPages, nonJaPages] = [randPages(3, 1, 7), randPages(2, 1, 7)];
+  const [global, nonJa] = await Promise.all([
+    Promise.all(globalPages.map(p =>
+      tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=100&with_genres=${genre}&page=${p}`)
+        .then(d => filterMovies(d.results)).catch(() => [])
+    )).then(r => shuffle(r.flat())),
+    Promise.all(nonJaPages.map(p =>
+      tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&with_genres=${genre}&without_original_language=ja&page=${p}`)
+        .then(d => filterMovies(d.results)).catch(() => [])
+    )).then(r => shuffle(r.flat())),
+  ]);
+  // Blend: 9 from global (may include anime), 9 from non-Japanese, then re-shuffle
+  return shuffle([...global.slice(0, 9), ...nonJa.slice(0, 9)]);
 }
 
 // ── Hall of Fame: 100 curated IDs from AFI Top 100 & Sight and Sound Greatest Films ──
@@ -344,17 +352,35 @@ async function fetchShortPool(kidMode = false) {
 
 async function fetchWorldCinemaPool(kidMode = false) {
   const extra = kidMode ? KID_GENRE_FILTER : '';
-  const langs = kidMode
-    // Stick to languages with a strong children's film tradition
-    ? ['ja', 'fr', 'it', 'de', 'es', 'zh', 'ko', 'sv']
-    : ['fr', 'ja', 'ko', 'it', 'es', 'de', 'zh', 'fa', 'ru', 'da', 'tr', 'pt', 'ar', 'sv', 'hi', 'pl', 'nl', 'ro', 'cs', 'hu'];
-  const selected = shuffle([...langs]).slice(0, 8);
+  // Exclude animated films — they belong in the animation category, not world cinema.
+  // This prevents anime from dominating this pool.
+  const noAnim = '&without_genres=16';
+
+  if (kidMode) {
+    const langs = ['ja', 'fr', 'it', 'de', 'es', 'zh', 'ko', 'sv'];
+    const results = await Promise.all(langs.map(lang => {
+      const page = Math.floor(Math.random() * 6) + 1;
+      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${extra}${noAnim}&page=${page}`)
+        .then(d => filterMovies(d.results).slice(0, 4)).catch(() => []);
+    }));
+    return shuffle(results.flat());
+  }
+
+  // Balanced language groups: pick 2 European, 2 Asian, 1 Latin/Middle-Eastern each run
+  // so no single region dominates the candidate pool.
+  const european  = ['fr', 'it', 'de', 'sv', 'da', 'nl', 'pl', 'ro', 'cs', 'hu', 'ru'];
+  const asian     = ['ja', 'ko', 'zh', 'hi', 'fa', 'tr'];
+  const latinMid  = ['es', 'pt', 'ar'];
+  const selected  = [
+    ...shuffle([...european]).slice(0, 4),
+    ...shuffle([...asian]).slice(0, 3),
+    ...shuffle([...latinMid]).slice(0, 1),
+  ];
   const results = await Promise.all(
     selected.map(lang => {
       const page = Math.floor(Math.random() * 6) + 1;
-      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${extra}&page=${page}`)
-        .then(d => filterMovies(d.results).slice(0, 4))
-        .catch(() => []);
+      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=${page}`)
+        .then(d => filterMovies(d.results).slice(0, 3)).catch(() => []);
     })
   );
   return shuffle(results.flat());
@@ -407,7 +433,7 @@ async function rankByCategoryWithClaude(profile, pools, kidMode = false) {
       : '(no candidates available)');
 
   const candidateSection = [
-    fmt('MAINSTREAM POOL — for "popular" category (high vote count, widely seen)', pools.popular),
+    fmt('MAINSTREAM POOL — for "popular" category (the mainstream choice: high vote count, widely seen)', pools.popular),
     fmt('INDIE POOL — for "indie" category (art-house, lesser-known, lower vote count preferred)', pools.indie),
     fmt('ANIMATION POOL — for "animation" category (must be animated film)', pools.animation),
     fmt('CLASSIC POOL — for "classic" category (pre-1985, legendary all-time greats)', pools.classic),
