@@ -907,16 +907,7 @@ section { position: relative; z-index: 1; }
   pointer-events: none;
 }
 
-/* ghost-bottom: row1 card — bridge the 10px flex gap upward to the panel above */
-.rx-card.ghost-bottom::before {
-  content: '';
-  position: absolute;
-  left: 0; right: 0;
-  height: 10px;
-  bottom: 100%;
-  background: color-mix(in srgb, var(--cat-color) 12%, transparent);
-  pointer-events: none;
-}
+/* ghost-bottom: row1 — no gap bridge needed; the flex gap above is left as-is */
 
 
 /* ── Our Choice ──────────────────────────────────────────────────────────────*/

@@ -371,12 +371,14 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // A single rAF fires before the browser has recalculated layout after un-hiding
-    // the element — scrollHeight hasn't grown yet. A short setTimeout lets the
-    // reflow complete first so we scroll to the true new page bottom.
-    setTimeout(() => {
-      easedScrollTo(document.body.scrollHeight, 700);
-    }, 60);
+    // display:none → display:block needs two rAF passes to fully reflow.
+    // First rAF: browser recalculates style. Second rAF: layout is committed.
+    // Only then is document.body.scrollHeight accurate for the new content.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        easedScrollTo(document.body.scrollHeight, 700);
+      });
+    });
   }
 });
 
@@ -590,10 +592,10 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // Mark ghost card: ghost-top bridges gap below (row0), ghost-bottom bridges gap above (row1)
-    cards[i].classList.add(i < 3 ? 'ghost-top' : 'ghost-bottom');
-    // Square the panel corners that touch the ghost card
-    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '10px 10px 0 0';
+    // Only row0 ghost cards get the gap bridge (ghost-top)
+    if (i < 3) cards[i].classList.add('ghost-top');
+    // Square the panel corners that abut the ghost card (row0 only)
+    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '';
 
     // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
     // The card's "snap" came from scroll firing 1+ second after the panel grew.
