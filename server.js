@@ -344,7 +344,7 @@ async function fetchShortPool(kidMode = false) {
   const extra = kidMode ? KID_GENRE_FILTER : '';
   const pages = randPages(3, 1, 12);
   const results = await Promise.all(pages.map(p =>
-    tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_runtime.lte=110${extra}&page=${p}`)
+    tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_runtime.lte=99${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
   return shuffle(results.flat()).slice(0, 18);
@@ -438,7 +438,7 @@ async function rankByCategoryWithClaude(profile, pools, kidMode = false) {
     fmt('ANIMATION POOL — for "animation" category (must be animated film)', pools.animation),
     fmt('CLASSIC POOL — for "classic" category (pre-1985, legendary all-time greats)', pools.classic),
     fmt('WORLD CINEMA POOL — for "world_cinema" category (non-English language only)', pools.world_cinema),
-    fmt('SHORT FILM POOL — for "short" category (runtime ≤ 110 minutes)', pools.short),
+    fmt('SHORT FILM POOL — for "short" category (runtime ≤ 99 minutes)', pools.short),
   ].join('\n\n');
 
   const kidInstruction = kidMode
@@ -465,7 +465,7 @@ Select exactly ONE film from each pool. Rules:
 - WORLD CINEMA: must be a non-English language film — no exceptions
 - ANIMATION: must be an animated film — no exceptions
 - CLASSIC: must be pre-1985; choose a genuinely legendary all-time great, not an obscure pick — these are icons everyone should see
-- SHORT: choose the film with the best psychological fit that is ≤ 110 minutes runtime
+- SHORT: choose the film with the best psychological fit that is ≤ 99 minutes runtime — NEVER pick a film over 99 minutes for this category
 - Do NOT repeat the same film across categories
 - Foreign and non-English films are equally valid across all categories
 - CRITICAL: Do NOT default to the most famous or obvious film in a pool. The pools are randomised — treat every candidate equally. Pick based purely on psychological fit, not cultural prominence. A lesser-known film that truly mirrors the viewer's need beats a famous one that only loosely fits.

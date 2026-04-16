@@ -864,30 +864,34 @@ section { position: relative; z-index: 1; }
   animation: none;          /* cancel cardReveal forwards-fill */
   opacity: 1;               /* prevent reverting to rx-card's base opacity:0 */
   transform: translateY(0); /* prevent reverting to base translateY(14px) — the drop bug */
-  overflow: visible;        /* allow ::after/::before gap-bridge to show outside card */
+  overflow: visible;        /* allow ::after gap-bridge to show outside card */
   cursor: pointer;          /* clicking ghost card closes the panel */
   background: color-mix(in srgb, var(--cat-color) 12%, transparent);
-  box-shadow: none !important;
+  box-shadow: 0 0 0 1px var(--cat-color); /* keep the outline stroke visible with curved corners */
   /* z-index: 1 elevates this card's stacking context above the panel.
      The panel's overflow:hidden creates its own stacking context; without
      this z-index the panel paints on top and hides the ::after gap-bridge. */
   z-index: 1;
 }
 
-/* Bridge the 10px flex gap between the ghost card and the expanded panel.
-   ghost-top: ghost is in row0 → extend background downward into gap below card.
-   ghost-bottom: ghost is in row1 → extend background upward into gap above card. */
-.rx-card.ghost-top::after,
-.rx-card.ghost-bottom::before {
+/* ghost-top: row0 card — square the bottom corners so they meet the gap bridge cleanly */
+.rx-card.ghost-top {
+  border-radius: 10px 10px 0 0;
+}
+
+/* Bridge the 10px flex gap between the top-row ghost card and the expanded panel.
+   ::after extends the tinted background downward into the flex gap.
+   Starts 1px above the card's bottom edge to overlap (and hide) the bottom stroke line,
+   giving a seamless colour transition from card into the gap. */
+.rx-card.ghost-top::after {
   content: '';
   position: absolute;
   left: 0; right: 0;
-  height: 10px;
+  height: 11px;              /* 10px gap + 1px to cover the bottom stroke */
+  top: calc(100% - 1px);     /* start 1px inside the card so the bottom stroke disappears */
   background: color-mix(in srgb, var(--cat-color) 12%, transparent);
   pointer-events: none;
 }
-.rx-card.ghost-top::after   { top: 100%; }
-.rx-card.ghost-bottom::before { bottom: 100%; }
 
 
 /* ── Our Choice ──────────────────────────────────────────────────────────────*/

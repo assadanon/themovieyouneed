@@ -371,11 +371,12 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // Give the DOM one frame to unhide the element, then scroll to page bottom
-    // so the full profile reveal (and footer) is always visible
-    requestAnimationFrame(() => {
+    // A single rAF fires before the browser has recalculated layout after un-hiding
+    // the element — scrollHeight hasn't grown yet. A short setTimeout lets the
+    // reflow complete first so we scroll to the true new page bottom.
+    setTimeout(() => {
       easedScrollTo(document.body.scrollHeight, 700);
-    });
+    }, 60);
   }
 });
 
@@ -589,10 +590,11 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // Mark ghost card so CSS ::after/:before bridges the 10px flex gap
-    cards[i].classList.add(i < 3 ? 'ghost-top' : 'ghost-bottom');
-    // Square the panel corners that touch the ghost card
-    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '10px 10px 0 0';
+    // Only bridge the flex gap for row0 cards (ghost-top).
+    // Row1 cards (bottom row) don't need the bridge — the panel is above them.
+    if (i < 3) cards[i].classList.add('ghost-top');
+    // Square only the panel corners that abut the ghost card (row0 only).
+    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '';
 
     // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
     // The card's "snap" came from scroll firing 1+ second after the panel grew.
