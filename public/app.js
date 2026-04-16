@@ -576,18 +576,29 @@ function renderResults({ profile, recommendations }) {
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
     // ── Phase 2 (T=380ms): panel expands after ghost fade settles ─────────────
-    // Sequence: ghost fades (0–350ms) → position moves (380–1430ms) → reveal
-    // cubic-bezier(0.65,0,0.35,1) = strong ease-in-out: very slow start so the
-    // card position change feels gradual rather than a sudden jump
+    // Instead of animating panel height (which triggers layout recalc every frame),
+    // we snap the panel to full height instantly and animate row1 via transform —
+    // GPU-composited, so the movement is genuinely smooth with no layout per frame.
     setTimeout(() => {
-      expandedPanel.style.willChange = 'height';
-      expandedPanel.style.transition = 'height 1.05s cubic-bezier(0.65, 0, 0.35, 1)';
-      expandedPanel.getBoundingClientRect(); // commit height=0 before transition
+      // Snap panel to full height with no transition (no jank from height anim)
+      expandedPanel.style.transition = 'none';
       expandedPanel.style.height     = panelTargetH + 'px';
+
+      // Offset row1 visually back to where it was before the panel pushed it down
+      row1.style.willChange = 'transform';
+      row1.style.transition = 'none';
+      row1.style.transform  = `translateY(-${panelTargetH}px)`;
+
+      // Flush: commits both changes atomically before we start the animation
+      row1.getBoundingClientRect();
+
+      // Animate row1 sliding down to its natural position — GPU composited
+      row1.style.transition = `transform 1.0s cubic-bezier(0.65, 0, 0.35, 1)`;
+      row1.style.transform  = 'translateY(0)';
     }, 380);
 
     // ── T=1480ms: measure live positions, build rounded perimeter, fade in ─────
-    // Panel done at 380+1050=1430ms; measure 50ms later when layout is settled
+    // Row1 transform done at 380+1000=1380ms; measure 100ms later when settled
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
       const cardRect2 = cards[i].getBoundingClientRect();
@@ -616,6 +627,10 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
+
+      // Scroll now: panel is at final position so measurements are accurate,
+      // and it feels responsive rather than happening as a late afterthought
+      scrollToCenter();
     }, 1480);
 
     // ── T=1580ms: panel content fades in ──────────────────────────────────────
@@ -626,13 +641,14 @@ function renderResults({ profile, recommendations }) {
       }
     }, 1580);
 
-    // ── T=1950ms: unlock; T=2000ms: scroll ────────────────────────────────────
+    // ── T=1750ms: unlock; clean up row1 transform + panel height ──────────────
     setTimeout(() => {
-      expandedPanel.style.height     = 'auto';
-      expandedPanel.style.willChange = '';
+      expandedPanel.style.height = 'auto';
+      row1.style.transition  = '';
+      row1.style.transform   = '';
+      row1.style.willChange  = '';
       panelBusy = false;
-    }, 1950);
-    setTimeout(() => scrollToCenter(), 2000);
+    }, 1750);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)
