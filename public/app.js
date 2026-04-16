@@ -576,15 +576,18 @@ function renderResults({ profile, recommendations }) {
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
     // ── Phase 2 (T=380ms): panel expands after ghost fade settles ─────────────
-    // Sequence: ghost fades (0–350ms) → position moves (380–1230ms) → reveal
+    // Sequence: ghost fades (0–350ms) → position moves (380–1430ms) → reveal
+    // cubic-bezier(0.65,0,0.35,1) = strong ease-in-out: very slow start so the
+    // card position change feels gradual rather than a sudden jump
     setTimeout(() => {
       expandedPanel.style.willChange = 'height';
-      expandedPanel.style.transition = 'height 0.85s cubic-bezier(0.4, 0, 0.2, 1)';
+      expandedPanel.style.transition = 'height 1.05s cubic-bezier(0.65, 0, 0.35, 1)';
+      expandedPanel.getBoundingClientRect(); // commit height=0 before transition
       expandedPanel.style.height     = panelTargetH + 'px';
     }, 380);
 
-    // ── T=1280ms: measure live positions, build rounded perimeter, fade in ─────
-    // Panel done at 380+850=1230ms; measure 50ms later when layout is settled
+    // ── T=1480ms: measure live positions, build rounded perimeter, fade in ─────
+    // Panel done at 380+1050=1430ms; measure 50ms later when layout is settled
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
       const cardRect2 = cards[i].getBoundingClientRect();
@@ -613,23 +616,23 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
-    }, 1280);
+    }, 1480);
 
-    // ── T=1380ms: panel content fades in ──────────────────────────────────────
+    // ── T=1580ms: panel content fades in ──────────────────────────────────────
     setTimeout(() => {
       if (epInner) {
         epInner.style.transition = 'opacity 0.5s ease';
         epInner.style.opacity    = '1';
       }
-    }, 1380);
+    }, 1580);
 
-    // ── T=1750ms: unlock; T=1800ms: scroll ────────────────────────────────────
+    // ── T=1950ms: unlock; T=2000ms: scroll ────────────────────────────────────
     setTimeout(() => {
       expandedPanel.style.height     = 'auto';
       expandedPanel.style.willChange = '';
       panelBusy = false;
-    }, 1750);
-    setTimeout(() => scrollToCenter(), 1800);
+    }, 1950);
+    setTimeout(() => scrollToCenter(), 2000);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)
