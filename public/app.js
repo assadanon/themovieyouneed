@@ -369,6 +369,10 @@ function wrapText(ctx, text, x, y, maxW, lineH, maxLines) {
 revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
+  if (!nowHidden) {
+    // Scroll so the expanded profile reveal is fully visible
+    setTimeout(() => profileReveal.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }
 });
 
 logoWrap.addEventListener('click', () => {
@@ -571,13 +575,16 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // ── Phase 2: panel expands (GPU hint + 0.9s) ───────────────────────────────
-    expandedPanel.style.willChange = 'height';
-    expandedPanel.style.transition = 'height 0.9s cubic-bezier(0.4, 0, 0.2, 1)';
-    expandedPanel.style.height     = panelTargetH + 'px';
+    // ── Phase 2 (T=380ms): panel expands after ghost fade settles ─────────────
+    // Sequence: ghost fades (0–350ms) → position moves (380–1230ms) → reveal
+    setTimeout(() => {
+      expandedPanel.style.willChange = 'height';
+      expandedPanel.style.transition = 'height 0.85s cubic-bezier(0.4, 0, 0.2, 1)';
+      expandedPanel.style.height     = panelTargetH + 'px';
+    }, 380);
 
-    // ── T=950ms: measure live positions, build rounded perimeter, fade in ───────
-    // Panel (0.9s) and content fade (0.4s) are both done by this point
+    // ── T=1280ms: measure live positions, build rounded perimeter, fade in ─────
+    // Panel done at 380+850=1230ms; measure 50ms later when layout is settled
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
       const cardRect2 = cards[i].getBoundingClientRect();
@@ -591,8 +598,8 @@ function renderResults({ profile, recommendations }) {
       const pT = panelRect.top    - gridRect.top;
       const pB = panelRect.bottom - gridRect.top;
 
-      // Union perimeter points (clockwise); duplicate points are filtered out
-      // for edge cases where ghost card aligns with panel edge (left/right card)
+      // Union perimeter points (clockwise); duplicate points filtered for
+      // left/right cards where ghost card edge aligns with panel edge
       const raw = i < 3
         ? [[gL,gT],[gR,gT],[gR,pT],[pR,pT],[pR,pB],[pL,pB],[pL,pT],[gL,pT]]
         : [[pL,pT],[pR,pT],[pR,pB],[gR,pB],[gR,gB],[gL,gB],[gL,pB],[pL,pB]];
@@ -606,23 +613,23 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
-    }, 950);
+    }, 1280);
 
-    // ── T=1050ms: panel content fades in ──────────────────────────────────────
+    // ── T=1380ms: panel content fades in ──────────────────────────────────────
     setTimeout(() => {
       if (epInner) {
         epInner.style.transition = 'opacity 0.5s ease';
         epInner.style.opacity    = '1';
       }
-    }, 1050);
+    }, 1380);
 
-    // ── T=1450ms: unlock; T=1500ms: scroll (after auto-height reflow settles) ──
+    // ── T=1750ms: unlock; T=1800ms: scroll ────────────────────────────────────
     setTimeout(() => {
-      expandedPanel.style.height    = 'auto';
+      expandedPanel.style.height     = 'auto';
       expandedPanel.style.willChange = '';
       panelBusy = false;
-    }, 1450);
-    setTimeout(() => scrollToCenter(), 1500);
+    }, 1750);
+    setTimeout(() => scrollToCenter(), 1800);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)
