@@ -868,6 +868,10 @@ section { position: relative; z-index: 1; }
   cursor: pointer;          /* clicking ghost card closes the panel */
   background: color-mix(in srgb, var(--cat-color) 12%, transparent);
   box-shadow: none !important;
+  /* z-index: 1 elevates this card's stacking context above the panel.
+     The panel's overflow:hidden creates its own stacking context; without
+     this z-index the panel paints on top and hides the ::after gap-bridge. */
+  z-index: 1;
 }
 
 /* Bridge the 10px flex gap between the ghost card and the expanded panel.
