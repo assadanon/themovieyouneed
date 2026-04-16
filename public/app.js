@@ -594,7 +594,7 @@ function renderResults({ profile, recommendations }) {
       // Height animation: panel grows 0→full, pushing row1 down organically.
       // Row1 ghost card is carried along by the layout — no translate juggling.
       expandedPanel.style.willChange = 'height';
-      expandedPanel.style.transition = `height 1.3s cubic-bezier(0.76, 0, 0.24, 1)`;
+      expandedPanel.style.transition = `height 1.0s cubic-bezier(0.76, 0, 0.24, 1)`;
       expandedPanel.getBoundingClientRect(); // flush height=0 before transition
       expandedPanel.style.height = panelTargetH + 'px';
 
@@ -602,8 +602,8 @@ function renderResults({ profile, recommendations }) {
       window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
     }, 380);
 
-    // ── T=1780ms: measure live positions, build rounded perimeter, fade in ─────
-    // Height anim done at 380+1300=1680ms; measure 100ms later when settled
+    // ── T=1530ms: measure live positions, build rounded perimeter, fade in ─────
+    // Height anim done at 380+1000=1380ms; measure 150ms later when settled
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
       const cardRect2 = cards[i].getBoundingClientRect();
@@ -632,22 +632,22 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
-    }, 1780);
+    }, 1530);
 
-    // ── T=1880ms: panel content fades in ──────────────────────────────────────
+    // ── T=1630ms: panel content fades in ──────────────────────────────────────
     setTimeout(() => {
       if (epInner) {
         epInner.style.transition = 'opacity 0.5s ease';
         epInner.style.opacity    = '1';
       }
-    }, 1880);
+    }, 1630);
 
-    // ── T=2100ms: unlock + set height auto ────────────────────────────────────
+    // ── T=1850ms: unlock + set height auto ────────────────────────────────────
     setTimeout(() => {
       expandedPanel.style.height     = 'auto';
       expandedPanel.style.willChange = '';
       panelBusy = false;
-    }, 2100);
+    }, 1850);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)

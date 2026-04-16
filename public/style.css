@@ -854,8 +854,9 @@ section { position: relative; z-index: 1; }
 
 /* ── Selected state: body collapses, card becomes a category-coloured shell ── */
 .rx-card.card-selected {
-  animation: none; /* cancel cardReveal forwards-fill */
-  opacity: 1;      /* prevent reverting to rx-card's base opacity:0 */
+  animation: none;          /* cancel cardReveal forwards-fill */
+  opacity: 1;               /* prevent reverting to rx-card's base opacity:0 */
+  transform: translateY(0); /* prevent reverting to base translateY(14px) — the drop bug */
   pointer-events: none;
   cursor: default;
   /* Soft coloured tint — the outline (rx-col-outline) provides the border */
