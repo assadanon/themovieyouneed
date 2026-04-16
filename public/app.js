@@ -505,23 +505,17 @@ function renderResults({ profile, recommendations }) {
     strokeSvg.style.opacity    = '0';
   }
 
-  // ── Scroll so the ghost card + expanded panel are vertically centred ────────
-  // Called AFTER animation settles so getBoundingClientRect values are final.
-  // Row-0 cards (i<3): ghost is above panel → top = card top, bottom = panel bottom
-  // Row-1 cards (i≥3): panel is above ghost → top = panel top, bottom = card bottom
-  function scrollToCenter(i) {
-    const cardRect  = cards[i].getBoundingClientRect();
-    const panelRect = expandedPanel.getBoundingClientRect();
-    const topVp  = i < 3 ? cardRect.top    : panelRect.top;
-    const botVp  = i < 3 ? panelRect.bottom : cardRect.bottom;
-    const groupH = botVp - topVp;
-    const topAbs = topVp + window.scrollY;
-    const botAbs = botVp + window.scrollY;
-    const midAbs = (topAbs + botAbs) / 2;
-    // Center the group; if too tall for viewport, show from top with margin
-    const scroll = groupH >= window.innerHeight
+  // ── Scroll so the expanded panel is vertically centred in the viewport ───────
+  // Centers the panel (the main content), letting the ghost card sit above/below.
+  // If the panel alone is taller than the viewport, pin its top with a margin.
+  function scrollToCenter() {
+    const panelRect  = expandedPanel.getBoundingClientRect();
+    const topAbs     = panelRect.top    + window.scrollY;
+    const botAbs     = panelRect.bottom + window.scrollY;
+    const panelMid   = (topAbs + botAbs) / 2;
+    const scroll = panelRect.height >= window.innerHeight
       ? topAbs - 24
-      : midAbs - window.innerHeight / 2;
+      : panelMid - window.innerHeight / 2;
     window.scrollTo({ top: Math.max(0, scroll), behavior: 'smooth' });
   }
 
@@ -628,7 +622,7 @@ function renderResults({ profile, recommendations }) {
       expandedPanel.style.willChange = '';
       panelBusy = false;
     }, 1450);
-    setTimeout(() => scrollToCenter(i), 1500);
+    setTimeout(() => scrollToCenter(), 1500);
   }
 
   // onDone callback fires after close animation settles (used for sequential open)
