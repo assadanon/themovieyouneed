@@ -783,6 +783,9 @@ section { position: relative; z-index: 1; }
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  /* Match the parent card's top border-radius so that when the card switches to
+     overflow:visible (ghost state) the band's own corners stay curved, not square. */
+  border-radius: 10px 10px 0 0;
   transition: padding 0.45s cubic-bezier(0.4, 0, 0.2, 1),
               border-radius 0.45s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.45s ease;
@@ -864,31 +867,53 @@ section { position: relative; z-index: 1; }
   animation: none;          /* cancel cardReveal forwards-fill */
   opacity: 1;               /* prevent reverting to rx-card's base opacity:0 */
   transform: translateY(0); /* prevent reverting to base translateY(14px) — the drop bug */
-  overflow: visible;        /* allow ::after gap-bridge to show outside card */
+  overflow: visible;        /* allow pseudo-elements to extend outside card bounds */
   cursor: pointer;          /* clicking ghost card closes the panel */
   background: color-mix(in srgb, var(--cat-color) 12%, transparent);
-  box-shadow: 0 0 0 1px var(--cat-color); /* keep the outline stroke visible with curved corners */
+  box-shadow: none;
   /* z-index: 1 elevates this card's stacking context above the panel.
      The panel's overflow:hidden creates its own stacking context; without
      this z-index the panel paints on top and hides the ::after gap-bridge. */
   z-index: 1;
 }
 
-/* ghost-top: row0 card — square the bottom corners so they meet the gap bridge cleanly */
+/* ghost-top: row0 card — square the bottom corners for a seamless join with the panel */
 .rx-card.ghost-top {
   border-radius: 10px 10px 0 0;
 }
 
-/* Bridge the 10px flex gap between the top-row ghost card and the expanded panel.
-   ::after extends the tinted background downward into the flex gap.
-   Starts 1px above the card's bottom edge to overlap (and hide) the bottom stroke line,
-   giving a seamless colour transition from card into the gap. */
+/* Stroke overlay: top + left + right only — no bottom border so the ghost card
+   flows into the expanded panel without a cut-off line.
+   Using ::before (overlay) rather than box-shadow so we can omit the bottom edge. */
+.rx-card.ghost-top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--cat-color);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Gap bridge: fill the 10px flex gap between ghost card and the expanded panel */
 .rx-card.ghost-top::after {
   content: '';
   position: absolute;
   left: 0; right: 0;
-  height: 11px;              /* 10px gap + 1px to cover the bottom stroke */
-  top: calc(100% - 1px);     /* start 1px inside the card so the bottom stroke disappears */
+  height: 10px;
+  top: 100%;
+  background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+  pointer-events: none;
+}
+
+/* ghost-bottom: row1 card — bridge the 10px flex gap upward to the panel above */
+.rx-card.ghost-bottom::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 10px;
+  bottom: 100%;
   background: color-mix(in srgb, var(--cat-color) 12%, transparent);
   pointer-events: none;
 }

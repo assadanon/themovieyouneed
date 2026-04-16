@@ -590,11 +590,10 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // Only bridge the flex gap for row0 cards (ghost-top).
-    // Row1 cards (bottom row) don't need the bridge — the panel is above them.
-    if (i < 3) cards[i].classList.add('ghost-top');
-    // Square only the panel corners that abut the ghost card (row0 only).
-    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '';
+    // Mark ghost card: ghost-top bridges gap below (row0), ghost-bottom bridges gap above (row1)
+    cards[i].classList.add(i < 3 ? 'ghost-top' : 'ghost-bottom');
+    // Square the panel corners that touch the ghost card
+    expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '10px 10px 0 0';
 
     // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
     // The card's "snap" came from scroll firing 1+ second after the panel grew.
