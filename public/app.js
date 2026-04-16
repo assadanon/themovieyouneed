@@ -370,8 +370,11 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // Scroll so the expanded profile reveal is fully visible
-    setTimeout(() => profileReveal.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    // Give the DOM one frame to unhide the element, then scroll to page bottom
+    // so the full profile reveal (and footer) is always visible
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    });
   }
 });
 
@@ -595,6 +598,10 @@ function renderResults({ profile, recommendations }) {
       // Animate row1 sliding down to its natural position — GPU composited
       row1.style.transition = `transform 1.0s cubic-bezier(0.65, 0, 0.35, 1)`;
       row1.style.transform  = 'translateY(0)';
+
+      // Scroll second — panel is already at full height so measurement is
+      // accurate, and smooth scroll happens in parallel with the row1 animation
+      scrollToCenter();
     }, 380);
 
     // ── T=1480ms: measure live positions, build rounded perimeter, fade in ─────
@@ -627,10 +634,6 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.getBoundingClientRect();
       strokeSvg.style.transition = 'opacity 0.45s ease';
       strokeSvg.style.opacity    = '0.8';
-
-      // Scroll now: panel is at final position so measurements are accurate,
-      // and it feels responsive rather than happening as a late afterthought
-      scrollToCenter();
     }, 1480);
 
     // ── T=1580ms: panel content fades in ──────────────────────────────────────
@@ -724,7 +727,7 @@ function buildExpandedHTML(rec) {
   const tmdbUrl     = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;
 
   const posterHTML = rec.poster
-    ? `<img src="${rec.poster}" alt="${escapeHtml(rec.title)}" loading="lazy">`
+    ? `<img src="${rec.poster}" alt="${escapeHtml(rec.title)}" loading="lazy" data-tmdb-id="${rec.tmdb_id}" onerror="refreshPoster(this)">`
     : `<div class="poster-placeholder">🎬</div>`;
 
   return `
@@ -759,7 +762,7 @@ function createMovieCard(movie) {
   card.style.setProperty('--cat-color', cat.color || 'var(--bg3)');
 
   const posterHTML = movie.poster
-    ? `<img src="${movie.poster}" alt="${escapeHtml(movie.title)}" loading="lazy">`
+    ? `<img src="${movie.poster}" alt="${escapeHtml(movie.title)}" loading="lazy" data-tmdb-id="${movie.tmdb_id}" onerror="refreshPoster(this)">`
     : `<div class="poster-placeholder">🎬</div>`;
 
   const actorsLine = (movie.actors || []).join(' · ');
@@ -873,6 +876,33 @@ function roundedPath(pts, r) {
       : `M ${ax} ${ay} Q ${curr[0]} ${curr[1]} ${bx} ${by}`;
   }
   return d + ' Z';
+}
+
+// Re-fetches a fresh poster URL from TMDB when the cached path returns a 404.
+// Called via onerror on every <img> that has a data-tmdb-id attribute.
+function refreshPoster(img) {
+  const id = img.dataset.tmdbId;
+  if (!id || img.dataset.refreshed) return; // guard against infinite retry
+  img.dataset.refreshed = 'true';
+  fetch(`/api/poster-url?id=${id}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (d?.poster) {
+        img.src = d.poster;
+      } else {
+        // Replace broken img with emoji placeholder
+        const ph = document.createElement('div');
+        ph.className = 'poster-placeholder';
+        ph.textContent = '🎬';
+        img.replaceWith(ph);
+      }
+    })
+    .catch(() => {
+      const ph = document.createElement('div');
+      ph.className = 'poster-placeholder';
+      ph.textContent = '🎬';
+      img.replaceWith(ph);
+    });
 }
 
 function escapeHtml(str) {

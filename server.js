@@ -576,6 +576,20 @@ app.get('/api/poster', async (req, res) => {
   }
 });
 
+// Returns a fresh poster URL for a given TMDB movie ID.
+// Client calls this via onerror when a hardcoded/cached poster path 404s.
+app.get('/api/poster-url', async (req, res) => {
+  const { id } = req.query;
+  if (!id || !/^\d+$/.test(id)) return res.status(400).json({ error: 'Invalid id' });
+  try {
+    const data = await tmdbFetch(`/movie/${id}`);
+    const poster = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
+    res.json({ poster });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Serve quiz questions
 app.get('/api/questions', (req, res) => {
   res.json(QUESTIONS.map(q => ({ text: q.text, options: q.options })));
