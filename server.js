@@ -11,6 +11,24 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const TMDB_KEY = process.env.TMDB_API_KEY;
 const TMDB = 'https://api.themoviedb.org/3';
 
+// ── Rate Limiting ─────────────────────────────────────────────────────────────
+// Simple in-memory IP-based limiter — no extra dependencies needed.
+const ipRequestMap = new Map();
+const RATE_LIMIT_MAX    = 4;      // max quiz submissions per window per IP
+const RATE_LIMIT_WINDOW = 60000;  // 60-second rolling window
+
+function isRateLimited(ip) {
+  const now   = Date.now();
+  const entry = ipRequestMap.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
+    ipRequestMap.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return true;
+  entry.count++;
+  return false;
+}
+
 // ── Quiz Data ─────────────────────────────────────────────────────────────────
 
 const QUESTIONS = [
@@ -55,13 +73,13 @@ const QUESTIONS = [
     ]
   },
   {
-    text: "Which of these best describes where you are emotionally right now?",
+    text: "When you think about who you were a year ago, how do you feel?",
     options: [
-      "Overwhelmed — feeling everything too intensely",
-      "Quietly hopeful — things feel tender but manageable",
-      "Numb — not feeling very much at all",
-      "Restless — I want to feel something different",
-      "Tender and close to the surface — easily moved"
+      "Distant — I've changed so much I barely recognise that version of me",
+      "Wistful — I miss something that was simpler or clearer then",
+      "Proud — I can see real growth in myself",
+      "Stuck — I feel like I haven't moved as much as I wanted to",
+      "Uncertain — the comparison makes me uneasy"
     ]
   },
   {
@@ -117,20 +135,52 @@ const QUESTIONS = [
 ];
 
 const SCORING = [
-  [{ meaning: 3 }, { connection: 2, meaning: 1 }, { catharsis: 3 }, { escapism: 3 }, { meaning: 2, connection: 1 }],
-  [{ connection: 3 }, { meaning: 2, escapism: 1 }, { catharsis: 2, meaning: 1 }, { meaning: 3 }, { connection: 2, escapism: 1 }],
-  [{ connection: 3, validation: 1 }, { meaning: 3 }, { catharsis: 3 }, { meaning: 2, validation: 1 }, { catharsis: 2, meaning: 1 }],
-  [{ validation: 3, connection: 1 }, { validation: 2 }, { catharsis: 2, meaning: 1 }, { connection: 3 }, { connection: 3, validation: 1 }],
-  [{ catharsis: 3 }, { meaning: 2, connection: 1 }, { meaning: 2, catharsis: 2 }, { escapism: 3 }, { catharsis: 2, connection: 1 }],
-  [{ catharsis: 3 }, { escapism: 3 }, { connection: 3, validation: 1 }, { meaning: 3 }, { escapism: 2, catharsis: 1 }],
-  [{ connection: 2, meaning: 1 }, { meaning: 2, catharsis: 1 }, { meaning: 2 }, { catharsis: 3 }, { meaning: 3 }],
-  [{ connection: 3 }, { connection: 2, catharsis: 1 }, { validation: 3 }, { catharsis: 3, connection: 1 }, { connection: 2, meaning: 1 }],
-  [{ meaning: 2, escapism: 1 }, { meaning: 3 }, { catharsis: 2, meaning: 1 }, { meaning: 2, validation: 1 }, { catharsis: 2, escapism: 2 }],
+  // Q1: How do you feel about where you are in life right now?
+  // lost/unmoored | quietly content | heavy | restless/eager | hopeful/building
+  [{ meaning: 3, identity: 2 }, { comfort: 2, meaning: 1 }, { catharsis: 3 }, { growth: 2, escapism: 2 }, { hope: 3, meaning: 1 }],
+
+  // Q2: When completely alone with your thoughts, what feeling shows up most?
+  // loneliness | clarity/quiet | anxiety/spiral | numbness | peace
+  [{ connection: 3 }, { meaning: 2, comfort: 1 }, { catharsis: 2, meaning: 1 }, { catharsis: 2, meaning: 2 }, { comfort: 2, connection: 1 }],
+
+  // Q3: What's weighing on you most right now?
+  // relationship | running out of time | something unsaid | choices | quiet heaviness
+  [{ connection: 3, validation: 1 }, { meaning: 2, growth: 2 }, { catharsis: 3 }, { meaning: 2, validation: 1 }, { catharsis: 2, meaning: 1 }],
+
+  // Q4: How well understood do you feel?
+  // rarely | sometimes | not sure | often | deeply
+  [{ validation: 3, identity: 2 }, { validation: 2, connection: 1 }, { identity: 2, catharsis: 1 }, { connection: 3 }, { connection: 3, comfort: 1 }],
+
+  // Q5 (new): When you think about who you were a year ago, how do you feel?
+  // distant/barely recognise | wistful/miss simpler | proud/real growth | stuck | uncertain/uneasy
+  [{ identity: 3, growth: 1 }, { catharsis: 2, comfort: 2 }, { growth: 3, meaning: 1 }, { growth: 2, catharsis: 2 }, { identity: 2, meaning: 1 }],
+
+  // Q6: What do you most wish you could do right now?
+  // cry | disappear | have someone with me | make sense | start fresh
+  [{ catharsis: 3 }, { escapism: 3 }, { connection: 3, validation: 1 }, { meaning: 3 }, { growth: 2, escapism: 2 }],
+
+  // Q7: When was the last time you felt genuinely at peace?
+  // recently | a while ago | brief moments | not recently | not sure/abstract
+  [{ comfort: 3 }, { hope: 2, catharsis: 1 }, { hope: 2, meaning: 1 }, { catharsis: 3 }, { meaning: 3 }],
+
+  // Q8: How do you feel about the people closest to you?
+  // grateful | distant | unseen | protective/hold back | curious
+  [{ connection: 3, comfort: 1 }, { connection: 2, catharsis: 1 }, { validation: 3 }, { catharsis: 3, connection: 1 }, { connection: 2, growth: 1 }],
+
+  // Q9: When you imagine the next year, what comes up first?
+  // excitement | uncertainty | fear | hope | heaviness
+  [{ hope: 3, growth: 1 }, { meaning: 3 }, { catharsis: 2, meaning: 1 }, { hope: 3 }, { catharsis: 2, growth: 2 }],
+
+  // Q10: If you could receive one thing from the world right now?
+  // truly seen | understand something | transported | release | connected
   [{ validation: 3, connection: 2 }, { meaning: 3 }, { escapism: 3 }, { catharsis: 3 }, { connection: 3 }],
 ];
 
 function computeNeedScores(answers) {
-  const scores = { catharsis: 0, meaning: 0, connection: 0, validation: 0, escapism: 0 };
+  const scores = {
+    catharsis: 0, meaning: 0, connection: 0, validation: 0,
+    escapism: 0,  comfort: 0, hope: 0,       growth: 0, identity: 0,
+  };
   answers.forEach((answerIdx, qIdx) => {
     const map = SCORING[qIdx]?.[answerIdx] || {};
     Object.entries(map).forEach(([need, val]) => { scores[need] += val; });
@@ -143,6 +193,42 @@ function buildAnswerSummary(answers) {
     const q = QUESTIONS[qIdx];
     return `Q${qIdx + 1}: "${q.text}"\nAnswer: "${q.options[answerIdx]}"`;
   }).join('\n\n');
+}
+
+// ── Safe JSON parser with markdown-fence stripping ────────────────────────────
+// Claude occasionally prepends/appends extra text or code fences.
+// This tries two passes before giving up, preventing hard server crashes.
+function safeParseJSON(text, label) {
+  const t = text.trim();
+  try {
+    return JSON.parse(t);
+  } catch (_) {
+    // Strip ```json ... ``` or ``` ... ``` fences and retry
+    const stripped = t
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+    try {
+      return JSON.parse(stripped);
+    } catch {
+      throw new Error(`Claude returned invalid JSON for ${label}. Raw: ${t.slice(0, 300)}`);
+    }
+  }
+}
+
+// ── Claude retry wrapper ──────────────────────────────────────────────────────
+// If Claude returns invalid JSON, safeParseJSON throws. This retries the entire
+// API call (not just the parse) up to maxRetries times before giving up.
+async function callWithRetry(fn, label, maxRetries = 1) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt === maxRetries) throw e;
+      console.warn(`[${label}] attempt ${attempt + 1} failed — ${e.message}. Retrying in 2s...`);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
 }
 
 // ── TMDB Helpers ──────────────────────────────────────────────────────────────
@@ -180,7 +266,7 @@ async function fetchPopularPool(kidMode = false) {
     tmdbFetch(`/discover/movie?sort_by=vote_count.desc&vote_average.gte=6.5&vote_count.gte=500${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 18);
+  return shuffle(results.flat()).slice(0, 12);
 }
 
 async function fetchIndiePool(kidMode = false) {
@@ -190,7 +276,7 @@ async function fetchIndiePool(kidMode = false) {
     tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=30&vote_count.lte=500&vote_average.gte=7.0${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 18);
+  return shuffle(results.flat()).slice(0, 12);
 }
 
 async function fetchAnimationPool(kidMode = false) {
@@ -209,7 +295,7 @@ async function fetchAnimationPool(kidMode = false) {
     )).then(r => shuffle(r.flat())),
   ]);
   // Blend: 9 from global (may include anime), 9 from non-Japanese, then re-shuffle
-  return shuffle([...global.slice(0, 9), ...nonJa.slice(0, 9)]);
+  return shuffle([...global.slice(0, 6), ...nonJa.slice(0, 6)]);
 }
 
 // ── Hall of Fame: 100 curated IDs from AFI Top 100 & Sight and Sound Greatest Films ──
@@ -326,7 +412,7 @@ async function fetchClassicPool(kidMode = false) {
       tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=100&with_genres=10751|16&primary_release_date.lte=1995-12-31&vote_average.gte=7.0&page=${p}`)
         .then(d => filterMovies(d.results)).catch(() => [])
     ));
-    return shuffle(results.flat()).slice(0, 18);
+    return shuffle(results.flat()).slice(0, 12);
   }
   // Hall of Fame: randomly sample 20 of the 100 curated icons each run for variety
   const selectedIds = shuffle([...HALL_OF_FAME_IDS]).slice(0, 20);
@@ -347,7 +433,7 @@ async function fetchShortPool(kidMode = false) {
     tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_runtime.lte=99${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 18);
+  return shuffle(results.flat()).slice(0, 12);
 }
 
 async function fetchWorldCinemaPool(kidMode = false) {
@@ -421,7 +507,7 @@ Dominant psychological signals detected: ${topNeeds.map(([k, v]) => `${k}(${v})`
     messages: [{ role: 'user', content: prompt }]
   });
 
-  return JSON.parse(msg.content[0].text.trim());
+  return safeParseJSON(msg.content[0].text, 'psychological analysis');
 }
 
 async function rankByCategoryWithClaude(profile, pools, kidMode = false) {
@@ -453,6 +539,10 @@ DEEP LOGIC:
 - VALIDATION → protagonist dismissed or invisible, ultimately proven right about themselves
 - CONNECTION → emotional isolation cracks; protagonist discovers they are not alone
 - ESCAPISM → a world so complete the viewer can fully inhabit it
+- COMFORT → safety sought; protagonist finds warmth, belonging, and home
+- HOPE → despair confronted; protagonist discovers a reason to believe again
+- GROWTH → stagnation broken; protagonist transforms through trial and challenge
+- IDENTITY → self-confusion resolved; protagonist discovers who they truly are
 
 VIEWER PROFILE:
 Psychological state: ${profile.psychological_state}
@@ -487,13 +577,19 @@ Return ONLY JSON (no backticks):
     messages: [{ role: 'user', content: prompt }]
   });
 
-  return JSON.parse(msg.content[0].text.trim());
+  return safeParseJSON(msg.content[0].text, 'film ranking');
 }
 
 // ── Main API Route ────────────────────────────────────────────────────────────
 
 app.post('/api/quiz', async (req, res) => {
   try {
+    // Rate limiting
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    if (isRateLimited(ip)) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a minute before trying again.' });
+    }
+
     const { answers, age } = req.body;
     if (!Array.isArray(answers) || answers.length !== 10) {
       return res.status(400).json({ error: 'Expected 10 quiz answers.' });
@@ -506,7 +602,10 @@ app.post('/api/quiz', async (req, res) => {
 
     // 2. Claude Call 1: psychological analysis
     console.log('Claude Call 1: psychological analysis...');
-    const profile = await analyzeWithClaude(answerSummary, topNeeds, age);
+    const profile = await callWithRetry(
+      () => analyzeWithClaude(answerSummary, topNeeds, age),
+      'Claude analysis'
+    );
     profile.needScores = needScores;
     console.log('Profile:', JSON.stringify(profile, null, 2));
 
@@ -543,7 +642,10 @@ app.post('/api/quiz', async (req, res) => {
 
     // 4. Claude Call 2: pick one per category
     console.log('Claude Call 2: ranking by category...');
-    const { recommendations } = await rankByCategoryWithClaude(profile, pools, kidMode);
+    const { recommendations } = await callWithRetry(
+      () => rankByCategoryWithClaude(profile, pools, kidMode),
+      'Claude ranking'
+    );
 
     // 5. Enrich each recommendation with credits, runtime + synopsis
     const allMovies = [...popularPool, ...indiePool, ...animationPool, ...classicPool, ...worldPool, ...shortPool];
@@ -639,10 +741,26 @@ app.get('/api/poster-url', async (req, res) => {
   }
 });
 
+// Returns a YouTube trailer key for a given TMDB movie ID.
+app.get('/api/trailer', async (req, res) => {
+  const { id } = req.query;
+  if (!id || !/^\d+$/.test(id)) return res.status(400).json({ error: 'Invalid id' });
+  try {
+    const data = await tmdbFetch(`/movie/${id}/videos`);
+    const trailer = (data.results || [])
+      .filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'))
+      .sort((a, b) => (a.type === 'Trailer' && b.type !== 'Trailer' ? -1 : 1))[0];
+    res.json({ key: trailer?.key || null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Serve quiz questions
 app.get('/api/questions', (req, res) => {
   res.json(QUESTIONS.map(q => ({ text: q.text, options: q.options })));
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -15,6 +15,12 @@ let currentQuestion = 0;
 let userAge = 25;
 let lastResults = null; // stored for image export
 
+// Shuffle state
+let originalResults  = null;
+let shuffledResults  = null;
+let showingShuffled  = false;
+let shuffleUsed      = false;
+
 // ── DOM Refs ──────────────────────────────────────────────────────────────────
 const mobileHeader      = document.getElementById('mobileHeader');
 const logoWrap          = document.getElementById('logoWrap');
@@ -23,6 +29,7 @@ const logoLine2         = logoWrap.querySelector('.logo-line2');
 const landing           = document.getElementById('landing');
 const tagline           = document.getElementById('tagline');
 const startBtn          = document.getElementById('startBtn');
+const restoreBtn        = document.getElementById('restoreBtn');
 const onboardingSection = document.getElementById('onboardingSection');
 const obStepAge         = document.getElementById('obStepAge');
 const ageSlider         = document.getElementById('ageSlider');
@@ -43,11 +50,19 @@ const submitBtn         = document.getElementById('submitBtn');
 const prescriptionState = document.getElementById('prescriptionState');
 const prescriptionNeed  = document.getElementById('prescriptionNeed');
 const recommendationsEl = document.getElementById('recommendations');
-const ourChoiceEl       = document.getElementById('ourChoice');
 const revealBtn         = document.getElementById('revealBtn');
 const profileReveal     = document.getElementById('profileReveal');
 const restartBtn        = document.getElementById('restartBtn');
 const shareBtn          = document.getElementById('shareBtn');
+const shuffleBtn        = document.getElementById('shuffleBtn');
+
+// ── Age Slider Fill ───────────────────────────────────────────────────────────
+// Draws a yellow fill from 0→thumb on the track so the chosen age is visible.
+function updateSliderFill(value) {
+  const pct = (value / 100) * 100;
+  ageSlider.style.background =
+    `linear-gradient(to right, #f7d44c 0%, #f7d44c ${pct}%, #102540 ${pct}%, #102540 100%)`;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -63,6 +78,20 @@ async function init() {
   } catch (e) {
     console.error('Failed to load questions:', e);
   }
+
+  // Initialise slider fill at default value (25)
+  updateSliderFill(25);
+
+  // Show "resume last prescription" button if a recent save exists (< 24h)
+  try {
+    const saved = localStorage.getItem('moviePrescription');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Date.now() - parsed.timestamp < 86400000) {
+        restoreBtn.classList.remove('hidden');
+      }
+    }
+  } catch (_) { /* ignore bad storage */ }
 
   // ── Logo animation (pure JS — no CSS keyframes) ──
   // Line 1 fades in
@@ -117,7 +146,7 @@ function selectOption(optionIndex) {
   submitBtn.classList.toggle('hidden', !isLast);
 }
 
-async function transitionToQuestion(index) {
+async function transitionToQuestion(index, direction = 'forward') {
   quizContainer.classList.add('transitioning');
   await sleep(220);
   showQuestion(index);
@@ -128,18 +157,40 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ── Keyboard navigation ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+
+  // Onboarding: ENTER triggers continue
+  if (!onboardingSection.classList.contains('hidden')) {
+    obContinueBtn.click();
+    return;
+  }
+
+  // Quiz: ENTER advances to next question or submits on the last one
+  if (!quizSection.classList.contains('hidden')) {
+    if (!submitBtn.classList.contains('hidden')) {
+      submitBtn.click();
+    } else if (!nextBtn.classList.contains('hidden')) {
+      nextBtn.click();
+    }
+  }
+});
+
 // ── Onboarding ────────────────────────────────────────────────────────────────
 function showOnboarding() {
   landing.classList.add('hidden');
   onboardingSection.classList.remove('hidden');
   userAge = 25;
-  ageSlider.value       = 25;
+  ageSlider.value = 25;
   ageSliderValue.textContent = '25';
+  updateSliderFill(25);
 }
 
 ageSlider.addEventListener('input', () => {
   userAge = parseInt(ageSlider.value, 10);
   ageSliderValue.textContent = userAge;
+  updateSliderFill(userAge);
 });
 
 obContinueBtn.addEventListener('click', startQuiz);
@@ -169,23 +220,60 @@ startBtn.addEventListener('click', async () => {
   showOnboarding();
 });
 
+// Restore last prescription from localStorage
+restoreBtn.addEventListener('click', () => {
+  try {
+    const saved = localStorage.getItem('moviePrescription');
+    if (!saved) return;
+    const { profile, recommendations } = JSON.parse(saved);
+    logoWrap.classList.add('shrunk');
+    landing.classList.add('hidden');
+    renderResults({ profile, recommendations });
+  } catch (_) {
+    restoreBtn.classList.add('hidden');
+  }
+});
+
 backBtn.addEventListener('click', () => {
   if (currentQuestion > 0) {
     currentQuestion--;
-    transitionToQuestion(currentQuestion);
+    transitionToQuestion(currentQuestion, 'back');
   }
 });
 
 nextBtn.addEventListener('click', () => {
   if (answers[currentQuestion] !== null && currentQuestion < questions.length - 1) {
     currentQuestion++;
-    transitionToQuestion(currentQuestion);
+    transitionToQuestion(currentQuestion, 'forward');
   }
 });
 
 submitBtn.addEventListener('click', submitQuiz);
-restartBtn.addEventListener('click', goHome);
 
+// ── Start over with two-click confirmation ────────────────────────────────────
+let restartConfirming     = false;
+let restartConfirmTimeout = null;
+
+restartBtn.addEventListener('click', () => {
+  if (restartConfirming) {
+    clearTimeout(restartConfirmTimeout);
+    restartConfirming = false;
+    restartBtn.textContent = 'start over';
+    restartBtn.classList.remove('confirming');
+    goHome();
+  } else {
+    restartConfirming = true;
+    restartBtn.textContent = 'are you sure?';
+    restartBtn.classList.add('confirming');
+    restartConfirmTimeout = setTimeout(() => {
+      restartConfirming = false;
+      restartBtn.textContent = 'start over';
+      restartBtn.classList.remove('confirming');
+    }, 3000);
+  }
+});
+
+// ── Share button with success feedback ────────────────────────────────────────
 shareBtn.addEventListener('click', async () => {
   if (!lastResults) return;
   shareBtn.textContent = 'generating...';
@@ -195,21 +283,89 @@ shareBtn.addEventListener('click', async () => {
     const file = new File([blob], 'my-prescription.png', { type: 'image/png' });
     if (navigator.share && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title: 'My Movie Prescription' });
+      showShareSuccess('shared ✓');
     } else {
       // Fallback: download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'my-prescription.png'; a.click();
       URL.revokeObjectURL(url);
+      showShareSuccess('saved ✓');
     }
   } catch (e) {
-    if (e.name !== 'AbortError') console.error('Share failed:', e);
+    if (e.name !== 'AbortError') {
+      console.error('Share failed:', e);
+      shareBtn.textContent = 'share results';
+    } else {
+      shareBtn.textContent = 'share results';
+    }
   } finally {
-    shareBtn.textContent = 'share results';
     shareBtn.disabled = false;
   }
 });
 
+function showShareSuccess(label) {
+  shareBtn.textContent = label;
+  shareBtn.classList.add('success');
+  setTimeout(() => {
+    shareBtn.textContent = 'share results';
+    shareBtn.classList.remove('success');
+  }, 2500);
+}
+
+// ── Shuffle picks ─────────────────────────────────────────────────────────────
+shuffleBtn.addEventListener('click', async () => {
+  // If shuffle was already used, toggle between original and shuffled
+  if (shuffleUsed) {
+    if (showingShuffled) {
+      showingShuffled = false;
+      shuffleBtn.textContent = 'see shuffled picks';
+      renderResults(originalResults, true);
+    } else {
+      showingShuffled = true;
+      shuffleBtn.textContent = 'see original picks';
+      renderResults(shuffledResults, true);
+    }
+    return;
+  }
+
+  // First shuffle: fetch fresh recommendations with the same answers
+  shuffleBtn.textContent = 'shuffling...';
+  shuffleBtn.disabled = true;
+
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 120000);
+    const res = await fetch('/api/quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers, age: userAge }),
+      signal: controller.signal,
+    });
+    clearTimeout(tid);
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Shuffle failed.');
+
+    originalResults  = { ...lastResults };
+    shuffledResults  = data;
+    shuffleUsed      = true;
+    showingShuffled  = true;
+
+    renderResults(shuffledResults, true);
+    shuffleBtn.textContent = 'see original picks';
+    shuffleBtn.disabled    = false;
+  } catch (e) {
+    console.error('Shuffle failed:', e);
+    shuffleBtn.textContent = 'shuffle picks';
+    shuffleBtn.disabled = false;
+
+    const msg = e.name === 'AbortError' ? 'Request timed out.' : (e.message || 'Shuffle failed.');
+    showToast(msg);
+  }
+});
+
+// ── Image export helpers ──────────────────────────────────────────────────────
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -223,20 +379,23 @@ function loadImage(src) {
 }
 
 async function generateResultsImage({ recommendations }) {
+  // Sort by fit percentage descending so the poster reflects the ranked order
+  const recs = [...recommendations].sort((a, b) => b.fit_percentage - a.fit_percentage);
+
   const DPR       = 2;
   const W         = 700;
   const PAD       = 44;
   const POSTER_W  = 90;
   const POSTER_H  = 135;
-  const CARD_H    = POSTER_H + 10; // a little breathing room top/bottom
+  const CARD_H    = POSTER_H + 10;
   const GAP       = 12;
   const CARD_PAD  = 14;
   const cardsTop  = 186;
-  const H         = cardsTop + (CARD_H + GAP) * recommendations.length + 72;
+  const H         = cardsTop + (CARD_H + GAP) * recs.length + 72;
 
   // Pre-load all posters in parallel
   const posters = await Promise.all(
-    recommendations.map(r => r.poster ? loadImage(r.poster) : Promise.resolve(null))
+    recs.map(r => r.poster ? loadImage(r.poster) : Promise.resolve(null))
   );
 
   const canvas = document.createElement('canvas');
@@ -263,8 +422,8 @@ async function generateResultsImage({ recommendations }) {
   ctx.fillText('YOUR PRESCRIPTION:', PAD, 126);
 
   // Cards
-  for (let i = 0; i < recommendations.length; i++) {
-    const rec    = recommendations[i];
+  for (let i = 0; i < recs.length; i++) {
+    const rec    = recs[i];
     const cat    = CATEGORIES[rec.category] || {};
     const y      = cardsTop + i * (CARD_H + GAP);
     const cardW  = W - PAD * 2;
@@ -299,10 +458,16 @@ async function generateResultsImage({ recommendations }) {
     const tx = posterX + POSTER_W + 16;
     const tw = cardW - (tx - PAD) - CARD_PAD;
 
-    // Category label
+    // Category label (left) + fit percentage (right-aligned)
     ctx.fillStyle = cat.color || '#ffffff';
     ctx.font = `600 10px 'DM Sans', sans-serif`;
     ctx.fillText((cat.label || rec.category).toUpperCase(), tx, y + 22);
+
+    // Percentage badge — right-aligned in the header area
+    const pctText = `${rec.fit_percentage}%`;
+    ctx.font = `700 12px 'DM Sans', sans-serif`;
+    const pctW = ctx.measureText(pctText).width;
+    ctx.fillText(pctText, tx + tw - pctW, y + 22);
 
     // Title
     ctx.fillStyle = '#eef6fc';
@@ -393,8 +558,27 @@ function goHome() {
   currentQuestion = 0;
   userAge = 25;
   profileReveal.classList.add('hidden');
-  ourChoiceEl.classList.add('hidden');
   revealBtn.textContent = 'what does this say about you?';
+
+  // Reset shuffle state
+  originalResults = null;
+  shuffledResults = null;
+  showingShuffled = false;
+  shuffleUsed     = false;
+  shuffleBtn.textContent = 'shuffle picks';
+  shuffleBtn.disabled    = false;
+  shuffleBtn.classList.add('hidden');
+
+  // Reset restart button
+  restartConfirming = false;
+  clearTimeout(restartConfirmTimeout);
+  restartBtn.textContent = 'start over';
+  restartBtn.classList.remove('confirming');
+
+  // Reset results title
+  const pageTitle = resultsSection.querySelector('.rx-page-title');
+  if (pageTitle) pageTitle.classList.remove('visible');
+
   landing.classList.remove('hidden');
 }
 
@@ -419,45 +603,81 @@ async function submitQuiz() {
     loadingSub.style.opacity = '1';
   }, 3200);
 
+  // Show a "taking longer than usual" message after 55s
+  const slowTimeout = setTimeout(async () => {
+    loadingSub.style.opacity = '0';
+    await sleep(300);
+    loadingSub.textContent = 'this is taking a bit longer than usual...';
+    loadingSub.style.opacity = '1';
+  }, 55000);
+
+  // Hard abort at 2 minutes
+  const controller = new AbortController();
+  const hardTimeout = setTimeout(() => controller.abort(), 120000);
+
   try {
     const res = await fetch('/api/quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers, age: userAge }),
+      signal: controller.signal,
     });
 
-    const data = await res.json();
+    clearTimeout(hardTimeout);
+    clearTimeout(slowTimeout);
     clearInterval(msgInterval);
+
+    const data = await res.json();
 
     if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
     renderResults(data);
   } catch (err) {
+    clearTimeout(hardTimeout);
+    clearTimeout(slowTimeout);
     clearInterval(msgInterval);
     loadingSection.classList.add('hidden');
     quizSection.classList.remove('hidden');
 
-    const errorBox = document.createElement('div');
-    errorBox.style.cssText = `
-      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
-      background: #1a0a0a; border: 1px solid #8b3030; color: #e88;
-      padding: 1rem 1.5rem; border-radius: 5px; font-size: 0.9rem;
-      max-width: 480px; text-align: center; z-index: 999;
-    `;
-    errorBox.textContent = err.message;
-    document.body.appendChild(errorBox);
-    setTimeout(() => errorBox.remove(), 6000);
+    const msg = err.name === 'AbortError'
+      ? 'The request timed out. Please try again.'
+      : (err.message || 'Something went wrong. Please try again.');
+
+    showToast(msg);
   }
 }
 
+// ── Toast notification ────────────────────────────────────────────────────────
+function showToast(message) {
+  const errorBox = document.createElement('div');
+  errorBox.style.cssText = `
+    position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+    background: #1a0a0a; border: 1px solid #8b3030; color: #e88;
+    padding: 1rem 1.5rem; border-radius: 5px; font-size: 0.9rem;
+    max-width: 480px; text-align: center; z-index: 999;
+    font-family: 'DM Sans', sans-serif;
+  `;
+  errorBox.textContent = message;
+  document.body.appendChild(errorBox);
+  setTimeout(() => errorBox.remove(), 6000);
+}
+
 // ── Render Results ────────────────────────────────────────────────────────────
-function renderResults({ profile, recommendations }) {
+// isShuffle=true means we're toggling between saved states; skip reset of shuffle controls.
+function renderResults({ profile, recommendations }, isShuffle = false) {
   lastResults = { profile, recommendations };
+
+  // Save to localStorage for session restore
+  try {
+    localStorage.setItem('moviePrescription', JSON.stringify({
+      profile, recommendations, timestamp: Date.now(),
+    }));
+  } catch (_) { /* storage full or unavailable */ }
+
   loadingSection.classList.add('hidden');
   resultsSection.classList.remove('hidden');
-  mobileHeader.classList.remove('hidden'); // show sticky logo on mobile
+  mobileHeader.classList.remove('hidden');
 
   profileReveal.classList.add('hidden');
-  ourChoiceEl.classList.add('hidden');
   revealBtn.textContent = 'what does this say about you?';
 
   prescriptionState.textContent = `"${profile.psychological_state}"`;
@@ -468,6 +688,13 @@ function renderResults({ profile, recommendations }) {
   if (!recommendations || recommendations.length === 0) {
     recommendationsEl.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:2rem 0">No recommendations found. Please try again.</p>';
     return;
+  }
+
+  // Results page title entrance animation
+  const pageTitle = resultsSection.querySelector('.rx-page-title');
+  if (pageTitle) {
+    pageTitle.classList.remove('visible');
+    requestAnimationFrame(() => requestAnimationFrame(() => pageTitle.classList.add('visible')));
   }
 
   // Sort by fit_percentage descending
@@ -541,12 +768,10 @@ function renderResults({ profile, recommendations }) {
   function collapseCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
-    // Snapshot natural height before any style changes
     const h = body.offsetHeight;
     body.style.overflow = 'hidden';
     body.style.height   = h + 'px';
-    body.getBoundingClientRect();             // flush so transition sees a fixed start value
-    // Fade + collapse together — card shrinks to just the band strip
+    body.getBoundingClientRect();
     body.style.transition = 'opacity 0.35s ease, height 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
     body.style.opacity    = '0';
     body.style.height     = '0px';
@@ -558,11 +783,9 @@ function renderResults({ profile, recommendations }) {
     const body = card.querySelector('.card-body');
     if (!body) return;
     card.classList.remove('card-selected');
-    // Clear collapsed state so card snaps back to natural height
     body.style.transition = '';
     body.style.height     = '';
     body.style.overflow   = '';
-    // Then fade content back in
     body.style.opacity    = '0';
     requestAnimationFrame(() => {
       body.style.transition = 'opacity 0.35s ease';
@@ -577,6 +800,35 @@ function renderResults({ profile, recommendations }) {
   function wireCloseBtn() {
     const btn = expandedPanel.querySelector('.ep-close-btn');
     if (btn) btn.addEventListener('click', e => { e.stopPropagation(); closePanel(); });
+
+    // Watch trailer button
+    const trailerBtn = expandedPanel.querySelector('.ep-trailer-btn');
+    if (trailerBtn) {
+      trailerBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const movieId = trailerBtn.dataset.movieId;
+        const prev = trailerBtn.textContent;
+        trailerBtn.textContent = 'loading...';
+        trailerBtn.disabled = true;
+        try {
+          const res  = await fetch(`/api/trailer?id=${movieId}`);
+          const data = await res.json();
+          if (data.key) {
+            window.open(`https://www.youtube.com/watch?v=${data.key}`, '_blank', 'noopener');
+            trailerBtn.textContent = 'watch trailer';
+          } else {
+            trailerBtn.textContent = 'no trailer found';
+            setTimeout(() => { trailerBtn.textContent = 'watch trailer'; trailerBtn.disabled = false; }, 2500);
+            return;
+          }
+        } catch {
+          trailerBtn.textContent = 'error';
+          setTimeout(() => { trailerBtn.textContent = 'watch trailer'; trailerBtn.disabled = false; }, 2500);
+          return;
+        }
+        trailerBtn.disabled = false;
+      });
+    }
   }
 
   function openPanel(i) {
@@ -584,7 +836,6 @@ function renderResults({ profile, recommendations }) {
     panelBusy = true;
     expandedIndex = i;
 
-    // ── Phase 1: ghost card content fades (card stays full height — no wipe) ───
     collapseCardBody(cards[i]);
 
     expandedPanel.innerHTML = buildExpandedHTML(sorted[i]);
@@ -593,7 +844,6 @@ function renderResults({ profile, recommendations }) {
     const epInner = expandedPanel.querySelector('.ep-inner');
     if (epInner) { epInner.style.opacity = '0'; epInner.style.transition = 'none'; }
 
-    // Measure panel target height synchronously before animating
     expandedPanel.style.transition = 'none';
     expandedPanel.style.height     = '0px';
     expandedPanel.getBoundingClientRect();
@@ -601,37 +851,24 @@ function renderResults({ profile, recommendations }) {
 
     const catColor = CATEGORIES[sorted[i].category]?.color || 'var(--text-dim)';
 
-    // Only row0 ghost cards get the gap bridge (ghost-top)
     if (i < 3) cards[i].classList.add('ghost-top');
-    // Square the panel corners that abut the ghost card (row0 only)
     expandedPanel.style.borderRadius = i < 3 ? '0 0 10px 10px' : '';
 
-    // ── Phase 2 (T=380ms): panel expands + scroll starts simultaneously ──────────
-    // The card's "snap" came from scroll firing 1+ second after the panel grew.
-    // Fix: pre-calculate the scroll target using panel.top (stable; doesn't depend
-    // on panel height) + known panelTargetH, then fire scroll and height animation
-    // at exactly the same moment so the card position and viewport drift together.
     setTimeout(() => {
-      // panel.top is the bottom of row0 regardless of panel height — stable anchor
-      const panelTopAbs  = expandedPanel.getBoundingClientRect().top + window.scrollY;
+      const panelTopAbs   = expandedPanel.getBoundingClientRect().top + window.scrollY;
       const panelFinalMid = panelTopAbs + panelTargetH / 2;
       const scrollTarget  = panelTargetH >= window.innerHeight
         ? panelTopAbs - 24
         : panelFinalMid - window.innerHeight / 2;
 
-      // Height animation: panel grows 0→full, pushing row1 down organically.
-      // Row1 ghost card is carried along by the layout — no translate juggling.
       expandedPanel.style.willChange = 'height';
       expandedPanel.style.transition = `height 1.0s cubic-bezier(0.76, 0, 0.24, 1)`;
-      expandedPanel.getBoundingClientRect(); // flush height=0 before transition
+      expandedPanel.getBoundingClientRect();
       expandedPanel.style.height = panelTargetH + 'px';
 
-      // Scroll at the exact same moment — card position and viewport move together
       easedScrollTo(Math.max(0, scrollTarget));
     }, 380);
 
-    // ── T=1530ms: measure live positions, build rounded perimeter, fade in ─────
-    // Height anim done at 380+1000=1380ms; measure 150ms later when settled
     setTimeout(() => {
       const gridRect  = grid.getBoundingClientRect();
       const cardRect2 = cards[i].getBoundingClientRect();
@@ -645,8 +882,6 @@ function renderResults({ profile, recommendations }) {
       const pT = panelRect.top    - gridRect.top;
       const pB = panelRect.bottom - gridRect.top;
 
-      // Union perimeter points (clockwise); duplicate points filtered for
-      // left/right cards where ghost card edge aligns with panel edge
       const raw = i < 3
         ? [[gL,gT],[gR,gT],[gR,pT],[pR,pT],[pR,pB],[pL,pB],[pL,pT],[gL,pT]]
         : [[pL,pT],[pR,pT],[pR,pB],[gR,pB],[gR,gB],[gL,gB],[gL,pB],[pL,pB]];
@@ -662,7 +897,6 @@ function renderResults({ profile, recommendations }) {
       strokeSvg.style.opacity    = '0.8';
     }, 1530);
 
-    // ── T=1630ms: panel content fades in ──────────────────────────────────────
     setTimeout(() => {
       if (epInner) {
         epInner.style.transition = 'opacity 0.5s ease';
@@ -670,7 +904,6 @@ function renderResults({ profile, recommendations }) {
       }
     }, 1630);
 
-    // ── T=1850ms: unlock + set height auto ────────────────────────────────────
     setTimeout(() => {
       expandedPanel.style.height     = 'auto';
       expandedPanel.style.willChange = '';
@@ -678,7 +911,6 @@ function renderResults({ profile, recommendations }) {
     }, 1850);
   }
 
-  // onDone callback fires after close animation settles (used for sequential open)
   function closePanel(onDone) {
     if (panelBusy) { if (onDone) onDone(); return; }
     panelBusy = true;
@@ -692,7 +924,6 @@ function renderResults({ profile, recommendations }) {
     }
     expandedPanel.style.borderRadius = '';
 
-    // Freeze then animate panel to 0 (0.8s)
     const h = expandedPanel.scrollHeight;
     expandedPanel.style.transition  = 'none';
     expandedPanel.style.height      = h + 'px';
@@ -716,7 +947,6 @@ function renderResults({ profile, recommendations }) {
       if (i === expandedIndex) {
         closePanel();
       } else if (expandedIndex !== null) {
-        // Close current card first, then open the new one
         closePanel(() => openPanel(i));
       } else {
         openPanel(i);
@@ -729,13 +959,14 @@ function renderResults({ profile, recommendations }) {
     setTimeout(() => card.classList.add('revealed'), i * 100);
   });
 
-  // Our choice — highest fit_percentage
-  const best = recommendations.reduce((a, b) => a.fit_percentage > b.fit_percentage ? a : b);
-  const cat = CATEGORIES[best.category] || { shortName: best.category, color: 'var(--white)' };
-  ourChoiceEl.innerHTML =
-    `our choice this time is ` +
-    `<span class="our-choice-cat" style="color:${cat.color}">${cat.shortName.toUpperCase()}</span>`;
-  ourChoiceEl.classList.remove('hidden');
+  // Set up shuffle button — only on first (non-shuffle) render
+  if (!isShuffle) {
+    shuffleUsed     = false;
+    showingShuffled = false;
+    shuffleBtn.textContent = 'shuffle picks';
+    shuffleBtn.disabled    = false;
+    shuffleBtn.classList.remove('hidden');
+  }
 
   setTimeout(() => {
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -745,7 +976,6 @@ function renderResults({ profile, recommendations }) {
 // ── Build expanded panel HTML ─────────────────────────────────────────────────
 function buildExpandedHTML(rec) {
   const cat = CATEGORIES[rec.category] || {};
-  const actorsLine = (rec.actors || []).join(' · ');
   const actorsFormatted = (rec.actors || []).join(', ');
   const crewLine = [
     rec.director     ? `<span class="crew-dir">dir.</span> ${escapeHtml(rec.director)}` : '',
@@ -776,6 +1006,7 @@ function buildExpandedHTML(rec) {
             ${runtimeText  ? `<span class="ep-runtime">⏱ ${runtimeText}</span>` : ''}
             <span class="ep-fit">${rec.fit_percentage}% resonance</span>
             ${rec.tmdb_id  ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
+            ${rec.tmdb_id  ? `<button class="ep-trailer-btn" data-movie-id="${rec.tmdb_id}">watch trailer</button>` : ''}
           </div>
         </div>
       </div>
@@ -911,7 +1142,7 @@ function roundedPath(pts, r) {
 // Called via onerror on every <img> that has a data-tmdb-id attribute.
 function refreshPoster(img) {
   const id = img.dataset.tmdbId;
-  if (!id || img.dataset.refreshed) return; // guard against infinite retry
+  if (!id || img.dataset.refreshed) return;
   img.dataset.refreshed = 'true';
   fetch(`/api/poster-url?id=${id}`)
     .then(r => r.ok ? r.json() : null)
@@ -919,7 +1150,6 @@ function refreshPoster(img) {
       if (d?.poster) {
         img.src = d.poster;
       } else {
-        // Replace with a properly-sized blank poster (no icon — same dims as real poster)
         const ph = document.createElement('div');
         ph.className = 'poster-placeholder poster-blank';
         img.replaceWith(ph);

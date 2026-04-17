@@ -32,6 +32,7 @@
       <span class="tagline-accent">(cinematically)</span>
     </p>
     <button class="start-btn" id="startBtn">start quiz</button>
+    <button class="restore-btn hidden" id="restoreBtn">resume last prescription →</button>
   </section>
 
   <!-- Onboarding: age only -->
@@ -46,6 +47,7 @@
             <span class="age-slider-value" id="ageSliderValue">25</span>
             <span class="age-slider-unit">years old</span>
           </div>
+          <p class="age-hint">helps us tailor your picks</p>
         </div>
         <button class="ob-continue-btn" id="obContinueBtn">continue →</button>
       </div>
@@ -91,7 +93,6 @@
     <div class="results-inner">
       <div class="rx-page-title">your prescription:</div>
       <div class="recommendations" id="recommendations"></div>
-      <div class="our-choice hidden" id="ourChoice"></div>
       <div class="results-footer">
         <button class="reveal-btn" id="revealBtn">what does this say about you?</button>
         <div class="profile-reveal hidden" id="profileReveal">
@@ -100,6 +101,7 @@
         </div>
         <div class="footer-actions">
           <button class="share-btn" id="shareBtn">share results</button>
+          <button class="shuffle-btn hidden" id="shuffleBtn">shuffle picks</button>
           <button class="restart-btn" id="restartBtn">start over</button>
         </div>
       </div>
