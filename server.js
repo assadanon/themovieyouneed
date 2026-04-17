@@ -666,9 +666,16 @@ async function getMovieCredits(id) {
 
 async function analyzeWithClaude(answerSummary, topNeeds, age) {
   const isChild = typeof age === 'number' && age < 12;
-  const ageNote = isChild
-    ? `\nIMPORTANT: This viewer is under 12 years old. All film recommendations must be age-appropriate for children.`
-    : '';
+
+  // Age context: shapes how Claude interprets the answers, but must never appear in output.
+  // The same feeling means something different at 19 vs 45 vs 70 — Claude should read
+  // the answers through the lens of where this person is in their life stage.
+  let ageNote = '';
+  if (isChild) {
+    ageNote = `\nIMPORTANT: This viewer is under 12 years old. All film recommendations must be age-appropriate for children.`;
+  } else if (typeof age === 'number') {
+    ageNote = `\nCONTEXT — The person is ${age} years old. Use this to calibrate your interpretation: the same emotional state carries different psychological weight at different life stages. A feeling of being lost at 20 speaks to identity formation; at 40 it may signal a midlife rupture; at 65 it may reflect legacy or mortality anxiety. Let the age invisibly shape the depth, tone, and specificity of your psychological reading — but do NOT mention the person's age anywhere in your output.`;
+  }
 
   const prompt = `You are a clinical psychologist specializing in narrative therapy and film as therapeutic tool.
 
