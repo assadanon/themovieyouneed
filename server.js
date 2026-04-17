@@ -176,21 +176,150 @@ const SCORING = [
   [{ validation: 3, connection: 2 }, { meaning: 3 }, { escapism: 3 }, { catharsis: 3 }, { connection: 3 }],
 ];
 
-function computeNeedScores(answers) {
+// ── Children's Quiz (age < 12) ────────────────────────────────────────────────
+const QUESTIONS_KIDS = [
+  {
+    text: "What kind of story sounds most exciting to you right now?",
+    options: [
+      "A big adventure with lots of action and brave heroes",
+      "A funny story that makes me laugh out loud",
+      "A story about friendship and sticking together no matter what",
+      "A magical world full of wonders I've never imagined",
+      "A mystery I get to help figure out along the way"
+    ]
+  },
+  {
+    text: "How are you feeling today?",
+    options: [
+      "Happy and full of energy — ready for anything",
+      "A little sad or missing someone special",
+      "Bored — I really need something exciting to happen",
+      "Worried or nervous about something",
+      "Cozy and calm — just want to relax and feel good"
+    ]
+  },
+  {
+    text: "What kind of hero do you like most in a story?",
+    options: [
+      "Someone super brave who never backs down from a challenge",
+      "Someone hilarious who always finds a way to make everyone smile",
+      "Someone kind and caring who protects the people they love",
+      "Someone clever who solves every problem with their brain",
+      "Someone ordinary who discovers they're more special than they knew"
+    ]
+  },
+  {
+    text: "What do you most want to feel when the movie ends?",
+    options: [
+      "Pumped up — like I could go on an adventure myself",
+      "Happy and giggly from all the funny moments",
+      "Warm inside — like everything is going to be okay",
+      "Amazed — like I just saw something truly magical",
+      "Like I made a new imaginary best friend"
+    ]
+  },
+  {
+    text: "If you could step into a movie world, which would you choose?",
+    options: [
+      "A world where animals can talk and become your best friends",
+      "Outer space or a faraway planet full of alien wonders",
+      "A magical kingdom with castles, dragons, and spells",
+      "A secret world hidden inside our everyday one",
+      "Anywhere — as long as my best friends come with me"
+    ]
+  },
+  {
+    text: "What's the best kind of ending to a story?",
+    options: [
+      "The hero defeats the villain and everyone is safe",
+      "Everyone laughs, dances, and celebrates together",
+      "Something surprising happens that I never saw coming",
+      "The hero learns an important lesson about themselves",
+      "Two characters become best friends forever"
+    ]
+  },
+  {
+    text: "Which of these sounds most like how you're feeling right now?",
+    options: [
+      "A little lonely — I'd love a story with a great friendship in it",
+      "Restless — I want something thrilling and full of action",
+      "I just want to feel safe and cozy — nothing too scary",
+      "Curious — I want to discover or learn something new",
+      "I want to go somewhere completely different in my imagination"
+    ]
+  },
+  {
+    text: "How do you feel about scary or tense moments in movies?",
+    options: [
+      "Bring them on — I love the thrill!",
+      "A little suspense is okay, but nothing too scary",
+      "I prefer zero scary stuff — keep it fun and happy",
+      "Monsters and villains are fine if the good guys win in the end",
+      "Spooky is okay as long as it's also kind of funny"
+    ]
+  },
+  {
+    text: "Which of these would you most want to see in a movie?",
+    options: [
+      "Dragons, unicorns, or other magical creatures",
+      "Dogs, cats, or real animals doing human things",
+      "Robots or friendly aliens from another world",
+      "Tiny creatures with a giant secret world of their own",
+      "I don't mind — the characters matter more than the creatures"
+    ]
+  },
+  {
+    text: "What matters most to you in a movie?",
+    options: [
+      "Exciting action and cool adventures",
+      "Lots of laughs from start to finish",
+      "Characters I really love and root for",
+      "A world I wish I could actually live in",
+      "A story that makes me feel something real in my heart"
+    ]
+  }
+];
+
+const SCORING_KIDS = [
+  // Q1: story type — adventure | funny | friendship | magical | mystery
+  [{ escapism: 3, growth: 1 }, { catharsis: 3 }, { connection: 3 }, { escapism: 3, meaning: 1 }, { meaning: 3 }],
+  // Q2: feeling today — happy/energy | sad/missing | bored | worried | cozy
+  [{ connection: 2, hope: 1 }, { catharsis: 3, connection: 1 }, { escapism: 3 }, { comfort: 3, catharsis: 1 }, { comfort: 3 }],
+  // Q3: hero type — brave | funny | kind | clever | ordinary/special
+  [{ escapism: 2, growth: 2 }, { catharsis: 3 }, { connection: 3, comfort: 1 }, { meaning: 3 }, { identity: 3, hope: 1 }],
+  // Q4: want to feel at end — pumped | giggly | warm | amazed | new friend
+  [{ escapism: 3, growth: 1 }, { catharsis: 3 }, { comfort: 3, hope: 1 }, { escapism: 3, meaning: 1 }, { connection: 3 }],
+  // Q5: movie world — animals talk | space | kingdom | secret world | with friends
+  [{ connection: 2, escapism: 2 }, { escapism: 3, meaning: 1 }, { escapism: 3 }, { escapism: 2, meaning: 2 }, { connection: 3, comfort: 1 }],
+  // Q6: best ending — hero wins | celebrate | surprise | hero learns | best friends
+  [{ escapism: 2, hope: 2 }, { connection: 3, catharsis: 1 }, { meaning: 3 }, { growth: 3, meaning: 1 }, { connection: 3 }],
+  // Q7: feeling right now — lonely | restless | safe/cozy | curious | somewhere different
+  [{ connection: 3, catharsis: 1 }, { escapism: 3, growth: 1 }, { comfort: 3 }, { meaning: 3 }, { escapism: 3 }],
+  // Q8: scary moments — bring it | little ok | none | good wins | spooky-funny
+  [{ escapism: 3, growth: 1 }, { escapism: 2, comfort: 1 }, { comfort: 3 }, { hope: 2, meaning: 1 }, { catharsis: 2, escapism: 1 }],
+  // Q9: creatures — magical | animals | robots/aliens | tiny world | characters matter
+  [{ escapism: 3, meaning: 1 }, { connection: 3 }, { escapism: 3 }, { escapism: 2, meaning: 2 }, { connection: 2, meaning: 2 }],
+  // Q10: what matters most — action | laughs | characters | world | feel something
+  [{ escapism: 3 }, { catharsis: 3 }, { connection: 3 }, { escapism: 2, meaning: 2 }, { catharsis: 2, meaning: 2 }],
+];
+
+function computeNeedScores(answers, isKid = false) {
+  const scoring = isKid ? SCORING_KIDS : SCORING;
   const scores = {
     catharsis: 0, meaning: 0, connection: 0, validation: 0,
     escapism: 0,  comfort: 0, hope: 0,       growth: 0, identity: 0,
   };
   answers.forEach((answerIdx, qIdx) => {
-    const map = SCORING[qIdx]?.[answerIdx] || {};
+    const map = scoring[qIdx]?.[answerIdx] || {};
     Object.entries(map).forEach(([need, val]) => { scores[need] += val; });
   });
   return scores;
 }
 
-function buildAnswerSummary(answers) {
+function buildAnswerSummary(answers, isKid = false) {
+  const qs = isKid ? QUESTIONS_KIDS : QUESTIONS;
   return answers.map((answerIdx, qIdx) => {
-    const q = QUESTIONS[qIdx];
+    const q = qs[qIdx];
     return `Q${qIdx + 1}: "${q.text}"\nAnswer: "${q.options[answerIdx]}"`;
   }).join('\n\n');
 }
@@ -595,10 +724,14 @@ app.post('/api/quiz', async (req, res) => {
       return res.status(400).json({ error: 'Expected 10 quiz answers.' });
     }
 
+    // Kid mode: age under 12 → age-appropriate content everywhere
+    const kidMode = typeof age === 'number' && age < 12;
+    if (kidMode) console.log('Kid mode active (age', age, ')');
+
     // 1. Compute need scores
-    const needScores   = computeNeedScores(answers);
-    const topNeeds     = Object.entries(needScores).sort(([, a], [, b]) => b - a);
-    const answerSummary = buildAnswerSummary(answers);
+    const needScores    = computeNeedScores(answers, kidMode);
+    const topNeeds      = Object.entries(needScores).sort(([, a], [, b]) => b - a);
+    const answerSummary = buildAnswerSummary(answers, kidMode);
 
     // 2. Claude Call 1: psychological analysis
     console.log('Claude Call 1: psychological analysis...');
@@ -608,10 +741,6 @@ app.post('/api/quiz', async (req, res) => {
     );
     profile.needScores = needScores;
     console.log('Profile:', JSON.stringify(profile, null, 2));
-
-    // Kid mode: age under 12 → all pools restricted to family/animation content
-    const kidMode = typeof age === 'number' && age < 12;
-    if (kidMode) console.log('Kid mode active (age', age, ')');
 
     // 3. Fetch category pools in parallel
     console.log('Fetching category pools...');
@@ -758,9 +887,98 @@ app.get('/api/trailer', async (req, res) => {
 
 // Serve quiz questions
 app.get('/api/questions', (req, res) => {
-  res.json(QUESTIONS.map(q => ({ text: q.text, options: q.options })));
+  const age = parseInt(req.query.age, 10);
+  const isKid = !isNaN(age) && age < 12;
+  const qs = isKid ? QUESTIONS_KIDS : QUESTIONS;
+  res.json(qs.map(q => ({ text: q.text, options: q.options })));
 });
 
+// Shuffle: re-fetches TMDB pools and re-ranks using the existing psychological profile.
+// Skips the first Claude analysis call — ~50% faster than a full quiz re-run.
+app.post('/api/shuffle', async (req, res) => {
+  try {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    if (isRateLimited(ip)) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a minute before trying again.' });
+    }
+
+    const { profile, age } = req.body;
+    if (!profile || !profile.psychological_state) {
+      return res.status(400).json({ error: 'Valid profile required.' });
+    }
+
+    const kidMode = typeof age === 'number' && age < 12;
+
+    // Fetch fresh pools
+    console.log('Shuffle: fetching fresh pools...');
+    const [popularPool, indiePool, animationPool, classicPool, worldPool, shortPool] = await Promise.all([
+      fetchPopularPool(kidMode).catch(e => { console.error('popular pool failed:', e.message); return []; }),
+      fetchIndiePool(kidMode).catch(e => { console.error('indie pool failed:', e.message); return []; }),
+      fetchAnimationPool(kidMode).catch(e => { console.error('animation pool failed:', e.message); return []; }),
+      fetchClassicPool(kidMode).catch(e => { console.error('classic pool failed:', e.message); return []; }),
+      fetchWorldCinemaPool(kidMode).catch(e => { console.error('world pool failed:', e.message); return []; }),
+      fetchShortPool(kidMode).catch(e => { console.error('short pool failed:', e.message); return []; }),
+    ]);
+
+    const pools = {
+      popular: popularPool, indie: indiePool, animation: animationPool,
+      classic: classicPool, world_cinema: worldPool, short: shortPool,
+    };
+
+    const totalCandidates = Object.values(pools).reduce((s, p) => s + p.length, 0);
+    if (totalCandidates < 5) throw new Error('Not enough movie candidates found. Please try again.');
+
+    // Re-rank with same profile but fresh candidates
+    console.log('Shuffle: Claude re-ranking...');
+    const { recommendations } = await callWithRetry(
+      () => rankByCategoryWithClaude(profile, pools, kidMode),
+      'Claude shuffle ranking'
+    );
+
+    // Enrich
+    const allMovies = [...popularPool, ...indiePool, ...animationPool, ...classicPool, ...worldPool, ...shortPool];
+    const movieMap  = {};
+    for (const m of allMovies) movieMap[m.id] = m;
+
+    const enriched = await Promise.all(
+      recommendations.slice(0, 6).map(async (rec) => {
+        const movie = movieMap[rec.tmdb_id];
+        if (!movie) { console.warn(`Shuffle: movie ${rec.tmdb_id} not in pool`); return null; }
+
+        const [credits, details] = await Promise.all([
+          getMovieCredits(movie.id).catch(() => ({ crew: [], cast: [] })),
+          tmdbFetch(`/movie/${movie.id}`).catch(() => ({})),
+        ]);
+        const director = credits.crew?.find(c => c.job === 'Director')?.name || 'Unknown';
+        const actors   = (credits.cast || []).slice(0, 3).map(a => a.name);
+        const runtime  = details.runtime || null;
+
+        const overview = movie.overview || '';
+        let synopsis = overview;
+        if (overview.length > 350) {
+          const sentenceMatch = overview.match(/^[\s\S]{100,350}?[.!?](?=\s|$)/);
+          synopsis = sentenceMatch ? sentenceMatch[0] : overview.slice(0, overview.lastIndexOf(' ', 300) || 300) + '…';
+        }
+
+        return {
+          tmdb_id: movie.id, category: rec.category, title: movie.title,
+          year: movie.release_date?.slice(0, 4) || '',
+          poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
+          director, actors, runtime, synopsis,
+          why_this_film: rec.why_this_film, fit_percentage: rec.fit_percentage,
+        };
+      })
+    );
+
+    const finalRecs = enriched.filter(Boolean);
+    console.log(`Shuffle: returning ${finalRecs.length} recommendations`);
+    res.json({ profile, recommendations: finalRecs });
+
+  } catch (err) {
+    console.error('Error in /api/shuffle:', err);
+    res.status(500).json({ error: err.message || 'Something went wrong. Please try again.' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

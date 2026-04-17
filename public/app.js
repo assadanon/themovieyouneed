@@ -195,8 +195,15 @@ ageSlider.addEventListener('input', () => {
 
 obContinueBtn.addEventListener('click', startQuiz);
 
-function startQuiz() {
+async function startQuiz() {
   onboardingSection.classList.add('hidden');
+  // Re-fetch with age so kids get child-appropriate questions
+  if (userAge < 12) {
+    try {
+      const res = await fetch(`/api/questions?age=${userAge}`);
+      questions = await res.json();
+    } catch (e) { console.error('Failed to load kid questions:', e); }
+  }
   quizSection.classList.remove('hidden');
   answers = Array(questions.length).fill(null);
   currentQuestion = 0;
@@ -225,7 +232,9 @@ restoreBtn.addEventListener('click', () => {
   try {
     const saved = localStorage.getItem('moviePrescription');
     if (!saved) return;
-    const { profile, recommendations } = JSON.parse(saved);
+    const { profile, recommendations, answers: savedAnswers, age: savedAge } = JSON.parse(saved);
+    if (savedAnswers) answers = savedAnswers;
+    if (typeof savedAge === 'number') userAge = savedAge;
     logoWrap.classList.add('shrunk');
     landing.classList.add('hidden');
     renderResults({ profile, recommendations });
@@ -315,31 +324,31 @@ function showShareSuccess(label) {
 
 // ── Shuffle picks ─────────────────────────────────────────────────────────────
 shuffleBtn.addEventListener('click', async () => {
-  // If shuffle was already used, toggle between original and shuffled
+  // Toggle between stored original and shuffled states (no new API call)
   if (shuffleUsed) {
     if (showingShuffled) {
       showingShuffled = false;
       shuffleBtn.textContent = 'see shuffled picks';
-      renderResults(originalResults, true);
+      renderResults(originalResults, { swapOnly: true });
     } else {
       showingShuffled = true;
       shuffleBtn.textContent = 'see original picks';
-      renderResults(shuffledResults, true);
+      renderResults(shuffledResults, { swapOnly: true });
     }
     return;
   }
 
-  // First shuffle: fetch fresh recommendations with the same answers
+  // First shuffle: call /api/shuffle (skips Claude analysis — much faster)
   shuffleBtn.textContent = 'shuffling...';
   shuffleBtn.disabled = true;
 
   try {
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 120000);
-    const res = await fetch('/api/quiz', {
+    const res = await fetch('/api/shuffle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, age: userAge }),
+      body: JSON.stringify({ profile: lastResults.profile, age: userAge }),
       signal: controller.signal,
     });
     clearTimeout(tid);
@@ -352,16 +361,14 @@ shuffleBtn.addEventListener('click', async () => {
     shuffleUsed      = true;
     showingShuffled  = true;
 
-    renderResults(shuffledResults, true);
+    renderResults(shuffledResults, { swapOnly: true });
     shuffleBtn.textContent = 'see original picks';
     shuffleBtn.disabled    = false;
   } catch (e) {
     console.error('Shuffle failed:', e);
     shuffleBtn.textContent = 'shuffle picks';
     shuffleBtn.disabled = false;
-
-    const msg = e.name === 'AbortError' ? 'Request timed out.' : (e.message || 'Shuffle failed.');
-    showToast(msg);
+    showToast(e.name === 'AbortError' ? 'Request timed out.' : (e.message || 'Shuffle failed.'));
   }
 });
 
@@ -386,8 +393,8 @@ async function generateResultsImage({ recommendations }) {
   const W         = 700;
   const PAD       = 44;
   const POSTER_W  = 90;
-  const POSTER_H  = 135;
-  const CARD_H    = POSTER_H + 10;
+  const POSTER_H  = 150;
+  const CARD_H    = 165;
   const GAP       = 12;
   const CARD_PAD  = 14;
   const cardsTop  = 186;
@@ -454,40 +461,50 @@ async function generateResultsImage({ recommendations }) {
       ctx.fill();
     }
 
-    // Text area starts after poster
+    // Text area
     const tx = posterX + POSTER_W + 16;
     const tw = cardW - (tx - PAD) - CARD_PAD;
+    let ty = y + 22;
 
-    // Category label (left) + fit percentage (right-aligned)
+    // Category label + percentage (same line)
     ctx.fillStyle = cat.color || '#ffffff';
     ctx.font = `600 10px 'DM Sans', sans-serif`;
-    ctx.fillText((cat.label || rec.category).toUpperCase(), tx, y + 22);
-
-    // Percentage badge — right-aligned in the header area
+    ctx.fillText((cat.label || rec.category).toUpperCase(), tx, ty);
     const pctText = `${rec.fit_percentage}%`;
     ctx.font = `700 12px 'DM Sans', sans-serif`;
     const pctW = ctx.measureText(pctText).width;
-    ctx.fillText(pctText, tx + tw - pctW, y + 22);
+    ctx.fillStyle = cat.color || '#ffffff';
+    ctx.fillText(pctText, tx + tw - pctW, ty);
+    ty += 22;
 
-    // Title
+    // Title (up to 2 lines)
     ctx.fillStyle = '#eef6fc';
-    ctx.font = `700 16px 'Playfair Display', serif`;
-    wrapText(ctx, `${rec.title} (${rec.year})`, tx, y + 44, tw, 20, 2);
+    ctx.font = `700 15px 'Playfair Display', serif`;
+    ty = wrapText(ctx, `${rec.title} (${rec.year})`, tx, ty, tw, 19, 2);
+    ty += 10;
 
-    // Director
-    ctx.fillStyle = '#5a7a95';
-    ctx.font = `300 11px 'DM Sans', sans-serif`;
-    ctx.fillText(`dir. ${rec.director || ''}`, tx, y + 74);
+    // Director (only if space remains)
+    if (ty + 14 <= y + CARD_H - 34) {
+      ctx.fillStyle = '#5a7a95';
+      ctx.font = `300 11px 'DM Sans', sans-serif`;
+      ctx.fillText(`dir. ${rec.director || ''}`, tx, ty);
+      ty += 17;
+    }
 
-    // Synopsis
-    ctx.fillStyle = '#8aa8be';
-    ctx.font = `300 11px 'DM Sans', sans-serif`;
-    wrapText(ctx, rec.synopsis || '', tx, y + 94, tw, 16, 2);
+    // Synopsis (max 2 lines, only if space)
+    if (ty + 15 <= y + CARD_H - 18) {
+      ctx.fillStyle = '#8aa8be';
+      ctx.font = `300 10.5px 'DM Sans', sans-serif`;
+      ty = wrapText(ctx, rec.synopsis || '', tx, ty, tw, 15, 2);
+      ty += 8;
+    }
 
-    // Why line
-    ctx.fillStyle = '#4a7060';
-    ctx.font = `italic 11px 'DM Sans', sans-serif`;
-    wrapText(ctx, rec.why_this_film || '', tx, y + 130, tw, 15, 1);
+    // Why line (max 1 line, only if space)
+    if (ty + 13 <= y + CARD_H - 2) {
+      ctx.fillStyle = '#4a7060';
+      ctx.font = `italic 10.5px 'DM Sans', sans-serif`;
+      wrapText(ctx, rec.why_this_film || '', tx, ty, tw, 13, 1);
+    }
   }
 
   // Footer
@@ -514,22 +531,25 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 function wrapText(ctx, text, x, y, maxW, lineH, maxLines) {
-  if (!text) return;
+  if (!text) return y;
   const words = text.split(' ');
   let line = '';
-  let lines = 0;
+  let lineCount = 0;
+  let curY = y;
   for (const word of words) {
-    const test = line ? line + ' ' + word : word;
+    const test = line ? `${line} ${word}` : word;
     if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, x, y);
+      ctx.fillText(line, x, curY);
+      lineCount++;
+      if (lineCount >= maxLines) return curY;
       line = word;
-      y += lineH;
-      if (++lines >= maxLines) { ctx.fillText(line + '…', x, y); return; }
+      curY += lineH;
     } else {
       line = test;
     }
   }
-  if (line) ctx.fillText(line, x, y);
+  if (line && lineCount < maxLines) ctx.fillText(line, x, curY);
+  return curY;
 }
 
 revealBtn.addEventListener('click', () => {
@@ -662,26 +682,27 @@ function showToast(message) {
 }
 
 // ── Render Results ────────────────────────────────────────────────────────────
-// isShuffle=true means we're toggling between saved states; skip reset of shuffle controls.
-function renderResults({ profile, recommendations }, isShuffle = false) {
+function renderResults({ profile, recommendations }, { swapOnly = false } = {}) {
   lastResults = { profile, recommendations };
 
   // Save to localStorage for session restore
   try {
     localStorage.setItem('moviePrescription', JSON.stringify({
-      profile, recommendations, timestamp: Date.now(),
+      profile, recommendations, answers: [...answers], age: userAge, timestamp: Date.now(),
     }));
   } catch (_) { /* storage full or unavailable */ }
 
-  loadingSection.classList.add('hidden');
-  resultsSection.classList.remove('hidden');
-  mobileHeader.classList.remove('hidden');
+  if (!swapOnly) {
+    loadingSection.classList.add('hidden');
+    resultsSection.classList.remove('hidden');
+    mobileHeader.classList.remove('hidden');
 
-  profileReveal.classList.add('hidden');
-  revealBtn.textContent = 'what does this say about you?';
+    profileReveal.classList.add('hidden');
+    revealBtn.textContent = 'what does this say about you?';
 
-  prescriptionState.textContent = `"${profile.psychological_state}"`;
-  prescriptionNeed.textContent  = profile.core_need;
+    prescriptionState.textContent = `"${profile.psychological_state}"`;
+    prescriptionNeed.textContent  = profile.core_need;
+  }
 
   recommendationsEl.innerHTML = '';
 
@@ -690,11 +711,13 @@ function renderResults({ profile, recommendations }, isShuffle = false) {
     return;
   }
 
-  // Results page title entrance animation
-  const pageTitle = resultsSection.querySelector('.rx-page-title');
-  if (pageTitle) {
-    pageTitle.classList.remove('visible');
-    requestAnimationFrame(() => requestAnimationFrame(() => pageTitle.classList.add('visible')));
+  if (!swapOnly) {
+    // Results page title entrance animation
+    const pageTitle = resultsSection.querySelector('.rx-page-title');
+    if (pageTitle) {
+      pageTitle.classList.remove('visible');
+      requestAnimationFrame(() => requestAnimationFrame(() => pageTitle.classList.add('visible')));
+    }
   }
 
   // Sort by fit_percentage descending
@@ -956,11 +979,11 @@ function renderResults({ profile, recommendations }, isShuffle = false) {
 
   // Staggered reveal
   cards.forEach((card, i) => {
-    setTimeout(() => card.classList.add('revealed'), i * 100);
+    setTimeout(() => card.classList.add('revealed'), i * (swapOnly ? 50 : 100));
   });
 
-  // Set up shuffle button — only on first (non-shuffle) render
-  if (!isShuffle) {
+  // Set up shuffle button — only on first (non-swap) render
+  if (!swapOnly) {
     shuffleUsed     = false;
     showingShuffled = false;
     shuffleBtn.textContent = 'shuffle picks';
@@ -968,9 +991,11 @@ function renderResults({ profile, recommendations }, isShuffle = false) {
     shuffleBtn.classList.remove('hidden');
   }
 
-  setTimeout(() => {
-    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 200);
+  if (!swapOnly) {
+    setTimeout(() => {
+      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+  }
 }
 
 // ── Build expanded panel HTML ─────────────────────────────────────────────────
@@ -986,7 +1011,7 @@ function buildExpandedHTML(rec) {
   const tmdbUrl     = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;
 
   const posterHTML = rec.poster
-    ? `<img src="${rec.poster}" alt="${escapeHtml(rec.title)}" loading="lazy" data-tmdb-id="${rec.tmdb_id}" onerror="refreshPoster(this)">`
+    ? `<img src="${rec.poster}" alt="${escapeHtml(rec.title)}" loading="eager" data-tmdb-id="${rec.tmdb_id}" onerror="refreshPoster(this)">`
     : `<div class="poster-placeholder">🎬</div>`;
 
   return `
@@ -1022,7 +1047,7 @@ function createMovieCard(movie) {
   card.style.setProperty('--cat-color', cat.color || 'var(--bg3)');
 
   const posterHTML = movie.poster
-    ? `<img src="${movie.poster}" alt="${escapeHtml(movie.title)}" loading="lazy" data-tmdb-id="${movie.tmdb_id}" onerror="refreshPoster(this)">`
+    ? `<img src="${movie.poster}" alt="${escapeHtml(movie.title)}" loading="eager" data-tmdb-id="${movie.tmdb_id}" onerror="refreshPoster(this)">`
     : `<div class="poster-placeholder">🎬</div>`;
 
   const actorsLine = (movie.actors || []).join(' · ');
@@ -1036,11 +1061,13 @@ function createMovieCard(movie) {
       <span class="card-band-label">${escapeHtml(cat.label || movie.category)}</span>
     </div>
     <div class="card-body">
-      <div class="card-poster-wrap">${posterHTML}</div>
+      <div class="card-poster-wrap">
+        ${posterHTML}
+        <div class="fit-badge">${movie.fit_percentage}%</div>
+      </div>
       <div class="card-content">
         <div class="card-title">${escapeHtml(movie.title)}<span class="card-year"> (${movie.year})</span></div>
         <div class="card-crew">${crewLine}</div>
-        <span class="fit-badge">${movie.fit_percentage}% resonance</span>
       </div>
     </div>
   `;

@@ -820,6 +820,7 @@ section { position: relative; z-index: 1; }
   overflow: hidden;
   flex-shrink: 0;
   background: var(--bg3);
+  position: relative;
 }
 .card-poster-wrap img {
   width: 100%; height: 100%;
@@ -836,6 +837,24 @@ section { position: relative; z-index: 1; }
 .poster-blank {
   background: linear-gradient(160deg, var(--bg3) 0%, var(--bg4) 60%, #0a1e34 100%);
   font-size: 0; /* hide any stray text */
+}
+
+/* Fit badge — absolute overlay in the poster bottom-right corner */
+.fit-badge {
+  position: absolute;
+  bottom: 7px;
+  right: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.82);
+  background: var(--cat-color, rgba(255,255,255,0.9));
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* ── Card category band (MD3-inspired coloured header) ───────────────────── */
@@ -931,22 +950,6 @@ section { position: relative; z-index: 1; }
 .crew-dir  { color: var(--text-dim); font-style: italic; }
 .crew-with { color: var(--text-dim); font-style: italic; }
 .crew-sep  { color: var(--text-dim); }
-
-/* Fit badge — slightly more prominent so the percentage reads clearly */
-.fit-badge {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: var(--cat-color, var(--text-muted));
-  background: rgba(255,255,255,0.05);
-  border: 1px solid color-mix(in srgb, var(--cat-color, var(--bg3)) 60%, transparent);
-  padding: 3px 9px;
-  border-radius: 10px;
-  display: inline-block;
-  margin-top: auto;
-  padding-top: 4px;
-  align-self: flex-start;
-}
 
 /* ── Selected state: body collapses, card becomes a category-coloured shell ── */
 .rx-card.card-selected {
