@@ -639,7 +639,7 @@ Dominant psychological signals detected: ${topNeeds.map(([k, v]) => `${k}(${v})`
   return safeParseJSON(msg.content[0].text, 'psychological analysis');
 }
 
-async function rankByCategoryWithClaude(profile, pools, kidMode = false) {
+async function rankByCategoryWithClaude(profile, pools, kidMode = false, originalRecs = null) {
   const fmt = (label, films) =>
     `--- ${label} ---\n` + (films.length
       ? films.map(m =>
@@ -660,7 +660,23 @@ async function rankByCategoryWithClaude(profile, pools, kidMode = false) {
     ? '\nIMPORTANT: This viewer is under 12 years old. Every film you select MUST be appropriate for children — G or PG rated, no adult themes, violence, or language. Prioritise wonder, adventure, friendship, and family themes.\n'
     : '';
 
-  const prompt = `You are a film therapist and narrative psychologist. Your task is NARRATIVE MIRRORING: match each film's protagonist journey to this viewer's psychological need.${kidInstruction}
+  // Shuffle constraint: runner-up picks must score lower than the originals
+  let shuffleConstraint = '';
+  if (originalRecs && originalRecs.length > 0) {
+    const caps = {};
+    for (const r of originalRecs) caps[r.category] = r.fit_percentage;
+    const capLines = Object.entries(caps)
+      .map(([cat, pct]) => `  - ${cat}: must be < ${pct}%`)
+      .join('\n');
+    const excludeIds = originalRecs.map(r => r.tmdb_id).join(', ');
+    shuffleConstraint = `\nSHUFFLE CONSTRAINTS — this is a runner-up request. The user already saw their ideal picks. Rules:
+1. Do NOT select any film with these TMDB IDs (already shown): ${excludeIds}
+2. Assign fit_percentage STRICTLY LOWER than the original in each category:
+${capLines}
+These are second-choice films — their resonance scores must reflect that.\n`;
+  }
+
+  const prompt = `You are a film therapist and narrative psychologist. Your task is NARRATIVE MIRRORING: match each film's protagonist journey to this viewer's psychological need.${kidInstruction}${shuffleConstraint}
 
 DEEP LOGIC:
 - CATHARSIS → suppressed emotion finally surfaces; protagonist breaks or releases
@@ -902,7 +918,7 @@ app.post('/api/shuffle', async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Please wait a minute before trying again.' });
     }
 
-    const { profile, age } = req.body;
+    const { profile, age, originalRecommendations } = req.body;
     if (!profile || !profile.psychological_state) {
       return res.status(400).json({ error: 'Valid profile required.' });
     }
@@ -925,13 +941,21 @@ app.post('/api/shuffle', async (req, res) => {
       classic: classicPool, world_cinema: worldPool, short: shortPool,
     };
 
+    // Exclude original picks from candidate pools so Claude can't re-select them
+    if (Array.isArray(originalRecommendations) && originalRecommendations.length > 0) {
+      const originalIds = new Set(originalRecommendations.map(r => r.tmdb_id));
+      for (const key of Object.keys(pools)) {
+        pools[key] = pools[key].filter(m => !originalIds.has(m.id));
+      }
+    }
+
     const totalCandidates = Object.values(pools).reduce((s, p) => s + p.length, 0);
     if (totalCandidates < 5) throw new Error('Not enough movie candidates found. Please try again.');
 
-    // Re-rank with same profile but fresh candidates
+    // Re-rank with same profile but fresh candidates and lower-score constraint
     console.log('Shuffle: Claude re-ranking...');
     const { recommendations } = await callWithRetry(
-      () => rankByCategoryWithClaude(profile, pools, kidMode),
+      () => rankByCategoryWithClaude(profile, pools, kidMode, originalRecommendations || null),
       'Claude shuffle ranking'
     );
 

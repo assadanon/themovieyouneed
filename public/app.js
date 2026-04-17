@@ -29,7 +29,6 @@ const logoLine2         = logoWrap.querySelector('.logo-line2');
 const landing           = document.getElementById('landing');
 const tagline           = document.getElementById('tagline');
 const startBtn          = document.getElementById('startBtn');
-const restoreBtn        = document.getElementById('restoreBtn');
 const onboardingSection = document.getElementById('onboardingSection');
 const obStepAge         = document.getElementById('obStepAge');
 const ageSlider         = document.getElementById('ageSlider');
@@ -81,17 +80,6 @@ async function init() {
 
   // Initialise slider fill at default value (25)
   updateSliderFill(25);
-
-  // Show "resume last prescription" button if a recent save exists (< 24h)
-  try {
-    const saved = localStorage.getItem('moviePrescription');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Date.now() - parsed.timestamp < 86400000) {
-        restoreBtn.classList.remove('hidden');
-      }
-    }
-  } catch (_) { /* ignore bad storage */ }
 
   // ── Logo animation (pure JS — no CSS keyframes) ──
   // Line 1 fades in
@@ -227,22 +215,6 @@ startBtn.addEventListener('click', async () => {
   showOnboarding();
 });
 
-// Restore last prescription from localStorage
-restoreBtn.addEventListener('click', () => {
-  try {
-    const saved = localStorage.getItem('moviePrescription');
-    if (!saved) return;
-    const { profile, recommendations, answers: savedAnswers, age: savedAge } = JSON.parse(saved);
-    if (savedAnswers) answers = savedAnswers;
-    if (typeof savedAge === 'number') userAge = savedAge;
-    logoWrap.classList.add('shrunk');
-    landing.classList.add('hidden');
-    renderResults({ profile, recommendations });
-  } catch (_) {
-    restoreBtn.classList.add('hidden');
-  }
-});
-
 backBtn.addEventListener('click', () => {
   if (currentQuestion > 0) {
     currentQuestion--;
@@ -348,7 +320,7 @@ shuffleBtn.addEventListener('click', async () => {
     const res = await fetch('/api/shuffle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile: lastResults.profile, age: userAge }),
+      body: JSON.stringify({ profile: lastResults.profile, age: userAge, originalRecommendations: lastResults.recommendations }),
       signal: controller.signal,
     });
     clearTimeout(tid);
@@ -1030,8 +1002,8 @@ function buildExpandedHTML(rec) {
           <div class="ep-meta">
             ${runtimeText  ? `<span class="ep-runtime">⏱ ${runtimeText}</span>` : ''}
             <span class="ep-fit">${rec.fit_percentage}% resonance</span>
-            ${rec.tmdb_id  ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
             ${rec.tmdb_id  ? `<button class="ep-trailer-btn" data-movie-id="${rec.tmdb_id}">watch trailer</button>` : ''}
+            ${rec.tmdb_id  ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
           </div>
         </div>
       </div>
