@@ -712,8 +712,8 @@ section { position: relative; z-index: 1; }
   font-family: 'DM Sans', sans-serif;
   font-size: 0.65rem;
   font-weight: 500;
-  color: var(--cat-color, var(--text-muted));
-  border: 1px solid var(--cat-color, var(--bg3));
+  color: var(--text);
+  border: 1px solid var(--bg3);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -834,14 +834,17 @@ section { position: relative; z-index: 1; }
   font-family: 'DM Sans', sans-serif;
   font-size: 0.72rem;
   font-weight: 700;
-  color: rgba(0, 0, 0, 0.82);
-  background: var(--cat-color, rgba(255,255,255,0.9));
+  color: var(--white);
+  background: rgba(5, 14, 29, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   padding: 3px 8px;
   border-radius: 6px;
   letter-spacing: 0.02em;
   line-height: 1.3;
   z-index: 2;
   pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 /* ── Card category band (MD3-inspired coloured header) ───────────────────── */
