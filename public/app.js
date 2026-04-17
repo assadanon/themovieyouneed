@@ -1025,7 +1025,7 @@ function createMovieCard(movie) {
   const actorsLine = (movie.actors || []).join(' · ');
   const crewLine   = [
     movie.director ? `<span class="crew-dir">dir.</span> ${escapeHtml(movie.director)}` : '',
-    actorsLine     ? escapeHtml(actorsLine) : '',
+    actorsLine     ? `<span class="crew-with">with:</span> ${escapeHtml(actorsLine)}` : '',
   ].filter(Boolean).join('<span class="crew-sep"> · </span>');
 
   card.innerHTML = `
