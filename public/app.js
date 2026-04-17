@@ -1030,7 +1030,7 @@ function createMovieCard(movie) {
 
   card.innerHTML = `
     <div class="card-band" style="background:${cat.color || 'var(--bg3)'}">
-      <span class="card-band-label">${escapeHtml(cat.label || movie.category)}</span>
+      <span class="card-band-label">${escapeHtml(cat.shortName || cat.label || movie.category)}</span>
     </div>
     <div class="card-body">
       <div class="card-poster-wrap">

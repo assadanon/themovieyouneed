@@ -720,7 +720,7 @@ section { position: relative; z-index: 1; }
 
 .ep-runtime {
   font-size: 0.72rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   letter-spacing: 0.06em;
 }
 
