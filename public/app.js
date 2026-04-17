@@ -371,11 +371,10 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // Reading offsetHeight forces a synchronous layout reflow, so
-    // document.body.scrollHeight is guaranteed up-to-date when we read it.
     setTimeout(() => {
-      void profileReveal.offsetHeight;
-      easedScrollTo(document.body.scrollHeight, 700);
+      void profileReveal.offsetHeight; // force reflow so scrollHeight is current
+      const pageBottom = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      window.scrollTo({ top: pageBottom, behavior: 'smooth' });
     }, 200);
   }
 });
