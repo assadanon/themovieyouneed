@@ -371,14 +371,11 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // footer-actions (share/restart) sits below profileReveal and is always
-    // visible — targeting its bottom is more reliable than profileReveal or
-    // document.body.scrollHeight (which can be stale after display:none→block).
-    // 200ms gives the browser time to fully reflow the newly shown element.
+    // Reading offsetHeight forces a synchronous layout reflow, so
+    // document.body.scrollHeight is guaranteed up-to-date when we read it.
     setTimeout(() => {
-      const footer = document.querySelector('.footer-actions');
-      const r      = (footer || profileReveal).getBoundingClientRect();
-      easedScrollTo(Math.max(0, window.scrollY + r.bottom - window.innerHeight + 48), 700);
+      void profileReveal.offsetHeight;
+      easedScrollTo(document.body.scrollHeight, 700);
     }, 200);
   }
 });
