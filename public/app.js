@@ -371,14 +371,17 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // display:none → display:block needs two rAF passes to fully reflow.
-    // First rAF: browser recalculates style. Second rAF: layout is committed.
-    // Only then is document.body.scrollHeight accurate for the new content.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        easedScrollTo(document.body.scrollHeight, 700);
-      });
-    });
+    // display:none → display:block reflow isn't guaranteed to be committed
+    // within even two rAF passes in all browsers. A 150ms timeout is
+    // imperceptible but ensures layout is settled before we read dimensions.
+    // Target the element's actual bottom via getBoundingClientRect() (forces
+    // reflow at read time) rather than document.body.scrollHeight which can
+    // still be stale if the browser hasn't repainted yet.
+    setTimeout(() => {
+      const r      = profileReveal.getBoundingClientRect();
+      const target = window.scrollY + r.bottom - window.innerHeight + 60;
+      easedScrollTo(Math.max(0, target), 700);
+    }, 150);
   }
 });
 
@@ -540,25 +543,20 @@ function renderResults({ profile, recommendations }) {
     requestAnimationFrame(step);
   }
 
-  // ── Fade-out then collapse ────────────────────────────────────────────────
+  // ── Fade-out + collapse height simultaneously ─────────────────────────────
   function collapseCardBody(card) {
     const body = card.querySelector('.card-body');
     if (!body) return;
-    // Phase 1: fade out content
-    body.style.transition = 'opacity 0.4s ease';
+    // Snapshot natural height before any style changes
+    const h = body.offsetHeight;
+    body.style.overflow = 'hidden';
+    body.style.height   = h + 'px';
+    body.getBoundingClientRect();             // flush so transition sees a fixed start value
+    // Fade + collapse together — card shrinks to just the band strip
+    body.style.transition = 'opacity 0.35s ease, height 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
     body.style.opacity    = '0';
+    body.style.height     = '0px';
     card.classList.add('card-selected');
-    // Phase 2: collapse height — starts at T=420ms, safely after the T=380ms
-    // scroll-target measurement (so panelTopAbs is read while the card is still
-    // full-height and the layout hasn't shifted yet).
-    setTimeout(() => {
-      const h = body.offsetHeight;
-      body.style.overflow   = 'hidden';
-      body.style.height     = h + 'px';
-      body.getBoundingClientRect();            // flush before transition
-      body.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-      body.style.height     = '0px';
-    }, 420);
   }
 
   // ── Restore: expand height then fade content back in ─────────────────────
