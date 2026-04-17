@@ -388,31 +388,33 @@ function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
 // When kidMode=true every pool restricts to family/animation content
 const KID_GENRE_FILTER = '&with_genres=10751|16';
 
-async function fetchPopularPool(kidMode = false) {
+async function fetchPopularPool(kidMode = false, random = false) {
   const extra = kidMode ? KID_GENRE_FILTER : '';
-  const pages = randPages(3, 1, 8);
+  const pages = random ? randPages(3, 1, 25) : [1, 2, 3];
   const results = await Promise.all(pages.map(p =>
     tmdbFetch(`/discover/movie?sort_by=vote_count.desc&vote_average.gte=6.5&vote_count.gte=500${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 12);
+  const all = results.flat();
+  return random ? shuffle(all).slice(0, 20) : all.slice(0, 20);
 }
 
-async function fetchIndiePool(kidMode = false) {
+async function fetchIndiePool(kidMode = false, random = false) {
   const extra = kidMode ? KID_GENRE_FILTER : '';
-  const pages = randPages(4, 1, 20);
+  const pages = random ? randPages(4, 1, 40) : [1, 2, 3, 4];
   const results = await Promise.all(pages.map(p =>
     tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=30&vote_count.lte=500&vote_average.gte=7.0${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 12);
+  return shuffle(results.flat()).slice(0, 20);
 }
 
-async function fetchAnimationPool(kidMode = false) {
+async function fetchAnimationPool(kidMode = false, random = false) {
   const genre = kidMode ? '10751|16' : '16';
   // Fetch global pool (may be anime-heavy) + explicitly non-Japanese pool, then mix.
   // This prevents the category from being dominated by Studio Ghibli / anime alone.
-  const [globalPages, nonJaPages] = [randPages(3, 1, 7), randPages(2, 1, 7)];
+  const globalPages = random ? randPages(3, 1, 12) : [1, 2, 3];
+  const nonJaPages  = random ? randPages(2, 1, 12) : [1, 2];
   const [global, nonJa] = await Promise.all([
     Promise.all(globalPages.map(p =>
       tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=100&with_genres=${genre}&page=${p}`)
@@ -423,8 +425,8 @@ async function fetchAnimationPool(kidMode = false) {
         .then(d => filterMovies(d.results)).catch(() => [])
     )).then(r => shuffle(r.flat())),
   ]);
-  // Blend: 9 from global (may include anime), 9 from non-Japanese, then re-shuffle
-  return shuffle([...global.slice(0, 6), ...nonJa.slice(0, 6)]);
+  // Blend: 10 from global (may include anime), 10 from non-Japanese, then re-shuffle
+  return shuffle([...global.slice(0, 10), ...nonJa.slice(0, 10)]);
 }
 
 // ── Hall of Fame: 100 curated IDs from AFI Top 100 & Sight and Sound Greatest Films ──
@@ -533,7 +535,7 @@ const HALL_OF_FAME_IDS = [
   269,   // Breathless / À bout de souffle (1960)
 ];
 
-async function fetchClassicPool(kidMode = false) {
+async function fetchClassicPool(kidMode = false, random = false) {
   if (kidMode) {
     // Classic family/animation films released before 1995, well-rated
     const pages = randPages(3, 1, 5);
@@ -543,8 +545,10 @@ async function fetchClassicPool(kidMode = false) {
     ));
     return shuffle(results.flat()).slice(0, 12);
   }
-  // Hall of Fame: randomly sample 20 of the 100 curated icons each run for variety
-  const selectedIds = shuffle([...HALL_OF_FAME_IDS]).slice(0, 20);
+  // Hall of Fame: deterministic = first 30 IDs; random = shuffle and pick 20
+  const selectedIds = random
+    ? shuffle([...HALL_OF_FAME_IDS]).slice(0, 20)
+    : HALL_OF_FAME_IDS.slice(0, 30);
   const results = await Promise.all(
     selectedIds.map(id =>
       tmdbFetch(`/movie/${id}`)
@@ -555,17 +559,17 @@ async function fetchClassicPool(kidMode = false) {
   return results.filter(Boolean);
 }
 
-async function fetchShortPool(kidMode = false) {
+async function fetchShortPool(kidMode = false, random = false) {
   const extra = kidMode ? KID_GENRE_FILTER : '';
-  const pages = randPages(3, 1, 12);
+  const pages = random ? randPages(3, 1, 20) : [1, 2, 3];
   const results = await Promise.all(pages.map(p =>
     tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_runtime.lte=99${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 12);
+  return shuffle(results.flat()).slice(0, 20);
 }
 
-async function fetchWorldCinemaPool(kidMode = false) {
+async function fetchWorldCinemaPool(kidMode = false, random = false) {
   const extra = kidMode ? KID_GENRE_FILTER : '';
   // Exclude animated films — they belong in the animation category, not world cinema.
   // This prevents anime from dominating this pool.
@@ -574,15 +578,26 @@ async function fetchWorldCinemaPool(kidMode = false) {
   if (kidMode) {
     const langs = ['ja', 'fr', 'it', 'de', 'es', 'zh', 'ko', 'sv'];
     const results = await Promise.all(langs.map(lang => {
-      const page = Math.floor(Math.random() * 6) + 1;
+      const page = random ? Math.floor(Math.random() * 8) + 1 : 1;
       return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${extra}${noAnim}&page=${page}`)
         .then(d => filterMovies(d.results).slice(0, 4)).catch(() => []);
     }));
     return shuffle(results.flat());
   }
 
-  // Balanced language groups: pick 2 European, 2 Asian, 1 Latin/Middle-Eastern each run
-  // so no single region dominates the candidate pool.
+  if (!random) {
+    // Deterministic: always use these 8 languages, page 1, slice 3 each → 24 candidates
+    const langs = ['fr', 'it', 'de', 'ja', 'ko', 'zh', 'es', 'pt'];
+    const results = await Promise.all(
+      langs.map(lang =>
+        tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=1`)
+          .then(d => filterMovies(d.results).slice(0, 3)).catch(() => [])
+      )
+    );
+    return shuffle(results.flat()).slice(0, 20);
+  }
+
+  // Random: balanced language groups, random pages
   const european  = ['fr', 'it', 'de', 'sv', 'da', 'nl', 'pl', 'ro', 'cs', 'hu', 'ru'];
   const asian     = ['ja', 'ko', 'zh', 'hi', 'fa', 'tr'];
   const latinMid  = ['es', 'pt', 'ar'];
@@ -599,6 +614,48 @@ async function fetchWorldCinemaPool(kidMode = false) {
     })
   );
   return shuffle(results.flat());
+}
+
+// Fetch films matching the user's psychological themes via TMDB keyword search.
+// For each search_query Claude generated, look up the TMDB keyword ID then fetch
+// well-rated films tagged with that keyword. Returns a deduplicated flat list.
+async function fetchProfilePool(searchQueries) {
+  if (!searchQueries || !searchQueries.length) return [];
+  const results = await Promise.all(
+    searchQueries.slice(0, 3).map(async (query) => {
+      try {
+        const kwRes = await tmdbFetch(`/search/keyword?query=${encodeURIComponent(query)}`);
+        const kw = (kwRes.results || [])[0];
+        if (!kw) return [];
+        const movies = await tmdbFetch(
+          `/discover/movie?with_keywords=${kw.id}&sort_by=vote_average.desc&vote_count.gte=80&vote_average.gte=7.0&page=1`
+        );
+        return filterMovies(movies.results || []).slice(0, 15);
+      } catch (e) {
+        console.warn(`Profile pool query "${query}" failed:`, e.message);
+        return [];
+      }
+    })
+  );
+  const seen = new Set();
+  return results.flat().filter(m => {
+    if (seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
+}
+
+// Blend profile-targeted films into each category pool.
+// Category films take priority; profile films fill remaining slots up to the cap.
+function blendProfilePool(pools, profilePool) {
+  if (!profilePool || !profilePool.length) return pools;
+  const blended = {};
+  for (const [key, categoryPool] of Object.entries(pools)) {
+    const seen = new Set(categoryPool.map(m => m.id));
+    const additions = profilePool.filter(m => !seen.has(m.id));
+    blended[key] = [...categoryPool, ...additions].slice(0, 25);
+  }
+  return blended;
 }
 
 async function getMovieCredits(id) {
@@ -760,25 +817,33 @@ app.post('/api/quiz', async (req, res) => {
 
     // 3. Fetch category pools in parallel
     console.log('Fetching category pools...');
+    // Deterministic pools — always fetch top pages so best films are always candidates
     const [popularPool, indiePool, animationPool, classicPool, worldPool, shortPool] = await Promise.all([
-      fetchPopularPool(kidMode).catch(e => { console.error('popular pool failed:', e.message); return []; }),
-      fetchIndiePool(kidMode).catch(e => { console.error('indie pool failed:', e.message); return []; }),
-      fetchAnimationPool(kidMode).catch(e => { console.error('animation pool failed:', e.message); return []; }),
-      fetchClassicPool(kidMode).catch(e => { console.error('classic pool failed:', e.message); return []; }),
-      fetchWorldCinemaPool(kidMode).catch(e => { console.error('world pool failed:', e.message); return []; }),
-      fetchShortPool(kidMode).catch(e => { console.error('short pool failed:', e.message); return []; }),
+      fetchPopularPool(kidMode, false).catch(e => { console.error('popular pool failed:', e.message); return []; }),
+      fetchIndiePool(kidMode, false).catch(e => { console.error('indie pool failed:', e.message); return []; }),
+      fetchAnimationPool(kidMode, false).catch(e => { console.error('animation pool failed:', e.message); return []; }),
+      fetchClassicPool(kidMode, false).catch(e => { console.error('classic pool failed:', e.message); return []; }),
+      fetchWorldCinemaPool(kidMode, false).catch(e => { console.error('world pool failed:', e.message); return []; }),
+      fetchShortPool(kidMode, false).catch(e => { console.error('short pool failed:', e.message); return []; }),
     ]);
 
     console.log(`Pool sizes — popular:${popularPool.length} indie:${indiePool.length} animation:${animationPool.length} classic:${classicPool.length} world:${worldPool.length} short:${shortPool.length}`);
 
-    const pools = {
+    // Fetch profile-targeted pool using Claude's search_queries and blend into category pools
+    const profilePool = await fetchProfilePool(profile.search_queries).catch(e => {
+      console.warn('Profile pool failed:', e.message);
+      return [];
+    });
+    console.log(`Profile pool: ${profilePool.length} films from queries: ${(profile.search_queries || []).join(', ')}`);
+
+    const pools = blendProfilePool({
       popular:      popularPool,
       indie:        indiePool,
       animation:    animationPool,
       classic:      classicPool,
       world_cinema: worldPool,
       short:        shortPool,
-    };
+    }, profilePool);
 
     const totalCandidates = Object.values(pools).reduce((s, p) => s + p.length, 0);
     if (totalCandidates < 5) {
@@ -793,7 +858,7 @@ app.post('/api/quiz', async (req, res) => {
     );
 
     // 5. Enrich each recommendation with credits, runtime + synopsis
-    const allMovies = [...popularPool, ...indiePool, ...animationPool, ...classicPool, ...worldPool, ...shortPool];
+    const allMovies = [...popularPool, ...indiePool, ...animationPool, ...classicPool, ...worldPool, ...shortPool, ...profilePool];
     const movieMap  = {};
     for (const m of allMovies) movieMap[m.id] = m;
 
@@ -927,13 +992,14 @@ app.post('/api/shuffle', async (req, res) => {
 
     // Fetch fresh pools
     console.log('Shuffle: fetching fresh pools...');
+    // Random pools for shuffle variety
     const [popularPool, indiePool, animationPool, classicPool, worldPool, shortPool] = await Promise.all([
-      fetchPopularPool(kidMode).catch(e => { console.error('popular pool failed:', e.message); return []; }),
-      fetchIndiePool(kidMode).catch(e => { console.error('indie pool failed:', e.message); return []; }),
-      fetchAnimationPool(kidMode).catch(e => { console.error('animation pool failed:', e.message); return []; }),
-      fetchClassicPool(kidMode).catch(e => { console.error('classic pool failed:', e.message); return []; }),
-      fetchWorldCinemaPool(kidMode).catch(e => { console.error('world pool failed:', e.message); return []; }),
-      fetchShortPool(kidMode).catch(e => { console.error('short pool failed:', e.message); return []; }),
+      fetchPopularPool(kidMode, true).catch(e => { console.error('popular pool failed:', e.message); return []; }),
+      fetchIndiePool(kidMode, true).catch(e => { console.error('indie pool failed:', e.message); return []; }),
+      fetchAnimationPool(kidMode, true).catch(e => { console.error('animation pool failed:', e.message); return []; }),
+      fetchClassicPool(kidMode, true).catch(e => { console.error('classic pool failed:', e.message); return []; }),
+      fetchWorldCinemaPool(kidMode, true).catch(e => { console.error('world pool failed:', e.message); return []; }),
+      fetchShortPool(kidMode, true).catch(e => { console.error('short pool failed:', e.message); return []; }),
     ]);
 
     const pools = {
