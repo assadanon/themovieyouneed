@@ -969,9 +969,10 @@ section { position: relative; z-index: 1; }
 }
 
 .profile-state {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Lora', serif;
   font-size: clamp(1rem, 2vw, 1.3rem);
   font-style: italic;
+  font-weight: 400;
   color: var(--white);
   line-height: 1.5;
   margin-bottom: 0.75rem;

@@ -371,17 +371,15 @@ revealBtn.addEventListener('click', () => {
   const nowHidden = profileReveal.classList.toggle('hidden');
   revealBtn.textContent = nowHidden ? 'what does this say about you?' : 'close';
   if (!nowHidden) {
-    // display:none → display:block reflow isn't guaranteed to be committed
-    // within even two rAF passes in all browsers. A 150ms timeout is
-    // imperceptible but ensures layout is settled before we read dimensions.
-    // Target the element's actual bottom via getBoundingClientRect() (forces
-    // reflow at read time) rather than document.body.scrollHeight which can
-    // still be stale if the browser hasn't repainted yet.
+    // footer-actions (share/restart) sits below profileReveal and is always
+    // visible — targeting its bottom is more reliable than profileReveal or
+    // document.body.scrollHeight (which can be stale after display:none→block).
+    // 200ms gives the browser time to fully reflow the newly shown element.
     setTimeout(() => {
-      const r      = profileReveal.getBoundingClientRect();
-      const target = window.scrollY + r.bottom - window.innerHeight + 60;
-      easedScrollTo(Math.max(0, target), 700);
-    }, 150);
+      const footer = document.querySelector('.footer-actions');
+      const r      = (footer || profileReveal).getBoundingClientRect();
+      easedScrollTo(Math.max(0, window.scrollY + r.bottom - window.innerHeight + 48), 700);
+    }, 200);
   }
 });
 
