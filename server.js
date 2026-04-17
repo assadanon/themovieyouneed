@@ -93,13 +93,13 @@ const QUESTIONS = [
     ]
   },
   {
-    text: "When was the last time you felt genuinely at peace?",
+    text: "What does your mind most feel like doing right now?",
     options: [
-      "Recently — I carry a general sense of calm",
-      "A while ago — I'm working my way back to it",
-      "In brief moments — it comes and goes",
-      "Not recently — something has been pulling at me",
-      "I'm not sure — peace feels abstract to me right now"
+      "Getting lost in something — I want to stop thinking and just be absorbed",
+      "Making sense of something — there's a thought I keep turning over",
+      "Feeling something deeply — I'm in the mood to be moved",
+      "Being surprised — I want something I didn't expect",
+      "Resting inside a story — just settling somewhere and staying a while"
     ]
   },
   {
@@ -159,9 +159,9 @@ const SCORING = [
   // cry | disappear | have someone with me | make sense | start fresh
   [{ catharsis: 3 }, { escapism: 3 }, { connection: 3, validation: 1 }, { meaning: 3 }, { growth: 2, escapism: 2 }],
 
-  // Q7: When was the last time you felt genuinely at peace?
-  // recently | a while ago | brief moments | not recently | not sure/abstract
-  [{ comfort: 3 }, { hope: 2, catharsis: 1 }, { hope: 2, meaning: 1 }, { catharsis: 3 }, { meaning: 3 }],
+  // Q7: What does your mind most feel like doing right now?
+  // getting lost | making sense | feeling deeply | being surprised | resting in a story
+  [{ escapism: 3 }, { meaning: 3 }, { catharsis: 3 }, { growth: 2, meaning: 1 }, { comfort: 3 }],
 
   // Q8: How do you feel about the people closest to you?
   // grateful | distant | unseen | protective/hold back | curious
