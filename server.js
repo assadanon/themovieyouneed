@@ -674,18 +674,19 @@ async function fetchWorldCinemaPool(kidMode = false, random = false) {
   // Oceania: Māori (New Zealand)
   const langs = ['fr', 'it', 'de', 'es', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'fa', 'tr', 'he', 'ar', 'yo', 'am', 'mi'];
 
-  // Each language gets a random page from 1–5 (all high-quality by vote_average.desc)
-  // so the same film never dominates the pool quiz after quiz.
-  // Filter by rating only — vote_count.gte=20 just prevents 1-vote noise.
+  // Each language gets a random page from 1–5 so the same film never dominates.
+  // No per-language slice — small catalogues (e.g. Hebrew: 11 films total) contribute
+  // everything they have, large catalogues contribute a full page (~20 films).
+  // The final shuffle+slice keeps the total manageable for the Claude prompt.
   const pageRange = random ? 8 : 5;
   const results = await Promise.all(
     langs.map(lang => {
       const page = Math.floor(Math.random() * pageRange) + 1;
       return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=20&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=${page}`)
-        .then(d => filterMovies(d.results).slice(0, 2)).catch(() => []);
+        .then(d => filterMovies(d.results)).catch(() => []);
     })
   );
-  return shuffle(results.flat()).slice(0, 24);
+  return shuffle(results.flat()).slice(0, 36);
 }
 
 // Fetch films matching the user's psychological themes via TMDB keyword search.
