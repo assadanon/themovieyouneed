@@ -406,7 +406,10 @@ async function fetchIndiePool(kidMode = false, random = false) {
     tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=30&vote_count.lte=500&vote_average.gte=7.0${extra}&page=${p}`)
       .then(d => filterMovies(d.results)).catch(() => [])
   ));
-  return shuffle(results.flat()).slice(0, 20);
+  // Exclude Hall of Fame classics — a low TMDB vote count doesn't make Tarkovsky
+  // or Bergman a "hidden gem". Those films belong in the classic pool only.
+  const hallOfFameSet = new Set(HALL_OF_FAME_IDS);
+  return shuffle(results.flat().filter(m => !hallOfFameSet.has(m.id))).slice(0, 20);
 }
 
 async function fetchAnimationPool(kidMode = false, random = false) {
@@ -760,7 +763,7 @@ Film prescription: ${profile.film_prescription_note}
 Top needs: ${profile.top_needs.join(', ')}
 
 Select exactly ONE film from each pool. Rules:
-- INDIE: choose the least commercially known film that still serves the need — prefer hidden gems over accessible hits
+- INDIE: choose a film by a genuinely obscure or little-celebrated filmmaker — a true hidden gem. Do NOT select a film simply because it has few votes if its director is widely considered one of the great masters of cinema (e.g. Tarkovsky, Bergman, Kubrick, Fellini, Godard). Those directors are legends — their films belong in CLASSIC or WORLD CINEMA, not here. Hidden gem means: an unknown or undersung director whose work deserves more attention.
 - WORLD CINEMA: must be a non-English language film — no exceptions
 - ANIMATION: must be an animated film — no exceptions
 - CLASSIC: must be pre-1985; choose a genuinely legendary all-time great, not an obscure pick — these are icons everyone should see
