@@ -680,10 +680,20 @@ async function fetchWorldCinemaPool(kidMode = false, random = false) {
   // The final shuffle+slice keeps the total manageable for the Claude prompt.
   const pageRange = random ? 8 : 5;
   const results = await Promise.all(
-    langs.map(lang => {
+    langs.map(async lang => {
       const page = Math.floor(Math.random() * pageRange) + 1;
-      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=20&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=${page}`)
-        .then(d => filterMovies(d.results)).catch(() => []);
+      const query = (minRating) =>
+        `/discover/movie?sort_by=vote_average.desc&vote_count.gte=20&vote_average.gte=${minRating}&with_original_language=${lang}${noAnim}&page=${page}`;
+
+      let films = await tmdbFetch(query(7.0)).then(d => filterMovies(d.results)).catch(() => []);
+
+      // Thin catalogue — widen the rating floor so small film industries
+      // (Māori, Yoruba, Amharic, Hebrew, etc.) still have something to offer.
+      if (films.length < 5) {
+        films = await tmdbFetch(query(4.5)).then(d => filterMovies(d.results)).catch(() => []);
+      }
+
+      return films;
     })
   );
   return shuffle(results.flat()).slice(0, 36);
