@@ -1198,7 +1198,7 @@ function showPreviewResults() {
         actors: ['Leonardo DiCaprio', 'Joseph Gordon-Levitt', 'Elliot Page'],
         synopsis: 'A thief who steals corporate secrets through dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.',
         why_this_film: 'Your hunger for layered, cerebral narratives makes this architecture of dreams a perfect prescription.',
-        fit_percentage: 94, runtime: 148, tmdb_id: 27205,
+        fit_percentage: 94, runtime: 148, tmdb_id: 27205, countries: ['United States of America', 'United Kingdom'],
         poster: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
       },
       {
@@ -1206,7 +1206,7 @@ function showPreviewResults() {
         director: 'Michel Gondry', actors: ['Jim Carrey', 'Kate Winslet'],
         synopsis: 'When their relationship turns sour, a couple undergoes a medical procedure to have each other erased from their memories.',
         why_this_film: 'A hidden gem that captures emotional truth in ways mainstream cinema rarely achieves.',
-        fit_percentage: 88, runtime: 108, tmdb_id: 38,
+        fit_percentage: 88, runtime: 108, tmdb_id: 38, countries: ['United States of America'],
         poster: 'https://image.tmdb.org/t/p/w500/5MwkWH9tYHv3mV9OiQ0ZhjR2411.jpg',
       },
       {
@@ -1214,7 +1214,7 @@ function showPreviewResults() {
         director: 'Hayao Miyazaki', actors: ['Daveigh Chase', 'Suzanne Pleshette'],
         synopsis: 'A young girl wanders into a world ruled by gods, witches, and spirits, where humans are changed into beasts.',
         why_this_film: 'This animated masterpiece speaks to the part of you yearning for wonder and transformation.',
-        fit_percentage: 85, runtime: 125, tmdb_id: 129,
+        fit_percentage: 85, runtime: 125, tmdb_id: 129, countries: ['Japan'],
         poster: 'https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg',
       },
       {
@@ -1222,7 +1222,7 @@ function showPreviewResults() {
         director: 'Alfred Hitchcock', actors: ['James Stewart', 'Kim Novak'],
         synopsis: 'A retired detective becomes obsessed with a woman he has been hired to follow, drawn into a labyrinth of identity and desire.',
         why_this_film: 'A hall of fame classic resonating with your psychological depth and appetite for unresolved tension.',
-        fit_percentage: 82, runtime: 128, tmdb_id: 426,
+        fit_percentage: 82, runtime: 128, tmdb_id: 426, countries: ['United States of America'],
         poster: 'https://image.tmdb.org/t/p/w500/3DqDMZJzelNG2mGVvIQfsiL0LZB.jpg',
       },
       {
@@ -1230,7 +1230,7 @@ function showPreviewResults() {
         director: 'Bong Joon-ho', actors: ['Song Kang-ho', 'Lee Sun-kyun', 'Cho Yeo-jeong'],
         synopsis: 'Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.',
         why_this_film: "World cinema at its most precise — this film's social architecture speaks directly to your current worldview.",
-        fit_percentage: 79, runtime: 132, tmdb_id: 496243,
+        fit_percentage: 79, runtime: 132, tmdb_id: 496243, countries: ['South Korea'],
         poster: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
       },
       {
@@ -1238,7 +1238,7 @@ function showPreviewResults() {
         director: 'Sofia Coppola', actors: ['Bill Murray', 'Scarlett Johansson'],
         synopsis: 'A faded movie star and a neglected young woman form an unlikely bond after crossing paths in Tokyo.',
         why_this_film: 'At 102 minutes, this quiet film says more in its silences than most epics say in three hours.',
-        fit_percentage: 76, runtime: 102, tmdb_id: 196,
+        fit_percentage: 76, runtime: 102, tmdb_id: 196, countries: ['United States of America', 'Japan'],
         poster: 'https://image.tmdb.org/t/p/w500/sQBBgWEd0VPLUJjjDRCoCB0SKjf.jpg',
       },
     ],
