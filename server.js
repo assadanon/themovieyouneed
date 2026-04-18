@@ -667,12 +667,12 @@ async function fetchWorldCinemaPool(kidMode = false, random = false) {
   }
 
   // Extended language list:
-  // Europe: French, Italian, German, Spanish, Portuguese, Russian
-  // Asia:   Japanese, Korean, Mandarin, Hindi, Persian (Iran), Turkish
-  // Africa: Arabic (Egypt-dominant), Yoruba (Nollywood), Amharic (Ethiopia)
+  // Europe:  French, Italian, German, Spanish, Portuguese, Russian
+  // Asia:    Japanese, Korean, Mandarin, Hindi, Persian (Iran), Turkish, Hebrew (Israel)
+  // MENA:    Arabic — covers Egypt, Lebanon, Palestine (Omar, Paradise Now, etc.)
+  // Africa:  Yoruba (Nollywood), Amharic (Ethiopia)
   // Oceania: Māori (New Zealand)
-  // Latin:  already covered by es/pt above
-  const langs = ['fr', 'it', 'de', 'es', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'fa', 'tr', 'ar', 'yo', 'am', 'mi'];
+  const langs = ['fr', 'it', 'de', 'es', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'fa', 'tr', 'he', 'ar', 'yo', 'am', 'mi'];
 
   // Each language gets a random page from 1–5 (all high-quality by vote_average.desc)
   // so the same film never dominates the pool quiz after quiz.
