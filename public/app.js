@@ -1112,8 +1112,9 @@ function buildExpandedHTML(rec) {
     actorsFormatted  ? `<span class="crew-with">with:</span> ${escapeHtml(actorsFormatted)}` : '',
   ].filter(Boolean).join('<span class="crew-sep"> | </span>');
 
-  const runtimeText = rec.runtime ? `${rec.runtime} min` : '';
-  const tmdbUrl     = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;
+  const runtimeText  = rec.runtime ? `${rec.runtime} min` : '';
+  const countriesText = (rec.countries || []).join(' · ');
+  const tmdbUrl      = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;
 
   const posterHTML = rec.poster
     ? `<img src="${rec.poster}" alt="${escapeHtml(rec.title)}" loading="eager" data-tmdb-id="${rec.tmdb_id}" onerror="refreshPoster(this)">`
@@ -1133,10 +1134,11 @@ function buildExpandedHTML(rec) {
           ${rec.why_this_film ? `<p class="ep-why">${escapeHtml(rec.why_this_film)}</p>` : ''}
           ${rec.synopsis      ? `<p class="ep-synopsis">${escapeHtml(rec.synopsis)}</p>` : ''}
           <div class="ep-meta">
-            ${runtimeText  ? `<span class="ep-runtime">⏱ ${runtimeText}</span>` : ''}
+            ${countriesText ? `<span class="ep-country">${escapeHtml(countriesText)}</span>` : ''}
+            ${runtimeText   ? `<span class="ep-runtime">⏱ ${runtimeText}</span>` : ''}
             <span class="ep-fit">${rec.fit_percentage}% resonance</span>
-            ${rec.tmdb_id  ? `<button class="ep-trailer-btn" data-movie-id="${rec.tmdb_id}">watch trailer</button>` : ''}
-            ${rec.tmdb_id  ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
+            ${rec.tmdb_id   ? `<button class="ep-trailer-btn" data-movie-id="${rec.tmdb_id}">watch trailer</button>` : ''}
+            ${rec.tmdb_id   ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
           </div>
         </div>
       </div>

@@ -968,6 +968,7 @@ app.post('/api/quiz', async (req, res) => {
         const director = credits.crew?.find(c => c.job === 'Director')?.name || 'Unknown';
         const actors   = (credits.cast || []).slice(0, 3).map(a => a.name);
         const runtime  = details.runtime || null; // minutes
+        const countries = (details.production_countries || []).slice(0, 2).map(c => c.name);
 
         const overview = movie.overview || '';
         let synopsis = overview;
@@ -991,6 +992,7 @@ app.post('/api/quiz', async (req, res) => {
           director,
           actors,
           runtime,
+          countries,
           synopsis,
           why_this_film:   rec.why_this_film,
           fit_percentage:  rec.fit_percentage,
@@ -1136,9 +1138,10 @@ app.post('/api/shuffle', async (req, res) => {
           getMovieCredits(movie.id).catch(() => ({ crew: [], cast: [] })),
           tmdbFetch(`/movie/${movie.id}`).catch(() => ({})),
         ]);
-        const director = credits.crew?.find(c => c.job === 'Director')?.name || 'Unknown';
-        const actors   = (credits.cast || []).slice(0, 3).map(a => a.name);
-        const runtime  = details.runtime || null;
+        const director  = credits.crew?.find(c => c.job === 'Director')?.name || 'Unknown';
+        const actors    = (credits.cast || []).slice(0, 3).map(a => a.name);
+        const runtime   = details.runtime || null;
+        const countries = (details.production_countries || []).slice(0, 2).map(c => c.name);
 
         const overview = movie.overview || '';
         let synopsis = overview;
@@ -1151,7 +1154,7 @@ app.post('/api/shuffle', async (req, res) => {
           tmdb_id: movie.id, category: rec.category, title: movie.title,
           year: movie.release_date?.slice(0, 4) || '',
           poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
-          director, actors, runtime, synopsis,
+          director, actors, runtime, countries, synopsis,
           why_this_film: rec.why_this_film, fit_percentage: rec.fit_percentage,
         };
       })

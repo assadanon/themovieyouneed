@@ -909,6 +909,12 @@ section { position: relative; z-index: 1; }
   border-radius: 10px;
 }
 
+.ep-country {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
 .ep-runtime {
   font-size: 0.72rem;
   color: var(--text-muted);
