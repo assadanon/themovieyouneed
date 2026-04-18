@@ -1113,7 +1113,7 @@ function buildExpandedHTML(rec) {
   ].filter(Boolean).join('<span class="crew-sep"> | </span>');
 
   const runtimeText  = rec.runtime ? `${rec.runtime} min` : '';
-  const countriesText = (rec.countries || []).join(' · ');
+  const countriesText = (rec.countries || []).map(shortenCountry).join(' · ');
   const tmdbUrl      = `https://www.themoviedb.org/movie/${rec.tmdb_id}`;
 
   const posterHTML = rec.poster
@@ -1294,6 +1294,45 @@ function refreshPoster(img) {
       ph.className = 'poster-placeholder poster-blank';
       img.replaceWith(ph);
     });
+}
+
+// ── Country name shortener ────────────────────────────────────────────────────
+// If a country name is longer than two words, substitute a short-form label.
+const COUNTRY_SHORT = {
+  'United States of America':          'USA',
+  'United Arab Emirates':              'UAE',
+  'United Kingdom':                    'UK',
+  'Democratic Republic of the Congo':  'DRC',
+  'Republic of the Congo':             'Congo',
+  'United Republic of Tanzania':       'Tanzania',
+  'Central African Republic':          'CAR',
+  'Bosnia and Herzegovina':            'Bosnia',
+  'Trinidad and Tobago':               'Trinidad',
+  'Papua New Guinea':                  'PNG',
+  'Republic of Korea':                 'South Korea',
+  'Republic of Ireland':               'Ireland',
+  "People's Republic of China":        'China',
+  'Islamic Republic of Iran':          'Iran',
+  'Federal Republic of Germany':       'Germany',
+  'Russian Federation':                'Russia',
+  'Kingdom of Saudi Arabia':           'Saudi Arabia',
+  'Republic of South Africa':          'South Africa',
+  'Czech Republic':                    'Czechia',
+  'Slovak Republic':                   'Slovakia',
+  'North Macedonia':                   'Macedonia',
+  'Saint Kitts and Nevis':             'St Kitts',
+  'Antigua and Barbuda':               'Antigua',
+  'São Tomé and Príncipe':             'São Tomé',
+  'Solomon Islands':                   'Solomon Is.',
+  'Marshall Islands':                  'Marshall Is.',
+};
+
+function shortenCountry(name) {
+  if (!name) return '';
+  if (COUNTRY_SHORT[name]) return COUNTRY_SHORT[name];
+  // Fallback: if still more than two words, return the first two
+  const words = name.split(' ');
+  return words.length > 2 ? words.slice(0, 2).join(' ') : name;
 }
 
 function escapeHtml(str) {
