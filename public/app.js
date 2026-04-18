@@ -107,17 +107,144 @@ function showQuestion(index) {
   progressFill.style.width   = `${(index / total) * 100}%`;
   questionText.textContent   = q.text;
 
+  const type = q.type || 'multiple-choice';
+
+  if (type === 'multiple-choice') renderMultipleChoice(q, index);
+  else if (type === 'slider')       renderSliderQ(q, index);
+  else if (type === 'spectrum')     renderSpectrumQ(q, index);
+  else if (type === 'this-or-that') renderThisOrThatQ(q, index);
+
+  updateNavButtons(index);
+}
+
+function renderMultipleChoice(q, index) {
   optionsEl.innerHTML = '';
   q.options.forEach((optText, i) => {
     const btn = document.createElement('button');
     btn.className = 'option' + (answers[index] === i ? ' selected' : '');
     btn.textContent = optText;
-    btn.addEventListener('click', () => selectOption(i));
+    btn.addEventListener('click', () => {
+      answers[index] = i;
+      document.querySelectorAll('.option').forEach((b, j) => b.classList.toggle('selected', j === i));
+      updateNavButtons(index);
+    });
     optionsEl.appendChild(btn);
   });
+}
 
-  const hasAnswer = answers[index] !== null && answers[index] !== undefined;
-  const isLast    = index === total - 1;
+function renderSliderQ(q, index) {
+  if (answers[index] === null || answers[index] === undefined) {
+    answers[index] = q.default || 5;
+  }
+  const current = answers[index];
+
+  optionsEl.innerHTML = `
+    <div class="q-slider-wrap">
+      <div class="q-poles">
+        <span class="q-pole">${escapeHtml(q.poles[0])}</span>
+        <span class="q-pole">${escapeHtml(q.poles[1])}</span>
+      </div>
+      <input type="range" class="q-main-slider" min="${q.min}" max="${q.max}" value="${current}" id="qSliderInput">
+      <div class="q-slider-value-row">
+        <span class="q-slider-num" id="qSliderNum">${current}</span>
+        <span class="q-slider-of">/ ${q.max}</span>
+      </div>
+    </div>
+  `;
+
+  const input = document.getElementById('qSliderInput');
+  const numEl = document.getElementById('qSliderNum');
+  updateQSliderFill(input);
+
+  input.addEventListener('input', () => {
+    const val = parseInt(input.value, 10);
+    answers[index] = val;
+    numEl.textContent = val;
+    updateQSliderFill(input);
+    updateNavButtons(index);
+  });
+}
+
+function updateQSliderFill(input) {
+  const min = parseInt(input.min, 10);
+  const max = parseInt(input.max, 10);
+  const val = parseInt(input.value, 10);
+  const pct = ((val - min) / (max - min)) * 100;
+  input.style.background =
+    `linear-gradient(to right, var(--green) 0%, var(--green) ${pct}%, var(--bg3) ${pct}%, var(--bg3) 100%)`;
+}
+
+function renderSpectrumQ(q, index) {
+  if (!Array.isArray(answers[index])) {
+    answers[index] = q.axes.map(() => 50);
+  }
+  const current = answers[index];
+
+  const axesHTML = q.axes.map((axis, i) => `
+    <div class="q-spectrum-axis">
+      <div class="q-spectrum-poles">
+        <span class="q-spec-pole">${escapeHtml(axis.poles[0])}</span>
+        <span class="q-spec-pole">${escapeHtml(axis.poles[1])}</span>
+      </div>
+      <input type="range" class="q-spectrum-slider" min="0" max="100" value="${current[i]}" data-axis="${i}">
+    </div>
+  `).join('<hr class="q-spectrum-divider">');
+
+  optionsEl.innerHTML = `<div class="q-spectrum-wrap">${axesHTML}</div>`;
+
+  optionsEl.querySelectorAll('.q-spectrum-slider').forEach(input => {
+    updateQSliderFill(input);
+    input.addEventListener('input', () => {
+      const axisIdx = parseInt(input.dataset.axis, 10);
+      answers[index][axisIdx] = parseInt(input.value, 10);
+      updateQSliderFill(input);
+      updateNavButtons(index);
+    });
+  });
+}
+
+function renderThisOrThatQ(q, index) {
+  if (!Array.isArray(answers[index])) {
+    answers[index] = q.pairs.map(() => null);
+  }
+
+  const pairsHTML = q.pairs.map((pair, i) => `
+    <div class="q-tot-pair" data-pair="${i}">
+      <button class="q-tot-opt ${answers[index][i] === 0 ? 'selected' : ''}" data-choice="0">${escapeHtml(pair[0])}</button>
+      <span class="q-tot-or">or</span>
+      <button class="q-tot-opt ${answers[index][i] === 1 ? 'selected' : ''}" data-choice="1">${escapeHtml(pair[1])}</button>
+    </div>
+  `).join('');
+
+  optionsEl.innerHTML = `
+    <p class="q-tot-hint">three quick pairs — trust your gut</p>
+    <div class="q-tot-wrap">${pairsHTML}</div>
+  `;
+
+  optionsEl.querySelectorAll('.q-tot-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pairEl = btn.closest('.q-tot-pair');
+      const pairIdx = parseInt(pairEl.dataset.pair, 10);
+      const choice  = parseInt(btn.dataset.choice, 10);
+      answers[index][pairIdx] = choice;
+      pairEl.querySelectorAll('.q-tot-opt').forEach((b, j) => b.classList.toggle('selected', j === choice));
+      updateNavButtons(index);
+    });
+  });
+}
+
+function updateNavButtons(index) {
+  const q     = questions[index];
+  const type  = q?.type || 'multiple-choice';
+  const total = questions.length;
+  const isLast = index === total - 1;
+
+  let hasAnswer;
+  if (type === 'this-or-that') {
+    hasAnswer = Array.isArray(answers[index]) && answers[index].every(v => v !== null && v !== undefined);
+  } else {
+    hasAnswer = answers[index] !== null && answers[index] !== undefined;
+  }
 
   backBtn.classList.toggle('hidden', index === 0);
   nextBtn.classList.toggle('hidden', !hasAnswer || isLast);

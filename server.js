@@ -43,14 +43,10 @@ const QUESTIONS = [
     ]
   },
   {
-    text: "When you're completely alone with your thoughts, what feeling shows up most?",
-    options: [
-      "Loneliness — I miss having someone truly close",
-      "Clarity — I actually enjoy the quiet",
-      "Anxiety — my thoughts spiral and won't settle",
-      "Numbness — I don't feel much at all",
-      "Peace — I feel comfortable in my own company"
-    ]
+    type: 'slider',
+    text: 'How connected do you feel to the people around you right now?',
+    poles: ['completely alone', 'deeply held'],
+    min: 1, max: 10, default: 5
   },
   {
     text: "What's weighing on you most right now?",
@@ -83,13 +79,12 @@ const QUESTIONS = [
     ]
   },
   {
-    text: "What do you most wish you could do right now?",
-    options: [
-      "Cry — really let it all out, with no judgment",
-      "Disappear for a while — be somewhere completely different",
-      "Have someone sit with me and truly understand",
-      "Finally make sense of what I've been feeling",
-      "Start fresh — leave something behind and begin again"
+    type: 'this-or-that',
+    text: 'Which feels more like you, right now?',
+    pairs: [
+      ['escape', 'understand'],
+      ['be seen', 'be alone'],
+      ['release', 'build']
     ]
   },
   {
@@ -113,13 +108,12 @@ const QUESTIONS = [
     ]
   },
   {
-    text: "When you imagine the next year of your life, what comes up first?",
-    options: [
-      "Excitement — I have real things to build toward",
-      "Uncertainty — I can't picture it clearly",
-      "Fear — I'm worried about what might change or not change",
-      "Hope — I believe something will shift",
-      "Heaviness — something needs to change but I don't know how"
+    type: 'spectrum',
+    text: 'Place yourself on each of these.',
+    axes: [
+      { poles: ['lost', 'grounded'] },
+      { poles: ['empty', 'overwhelmed'] },
+      { poles: ['closed off', 'wide open'] }
     ]
   },
   {
@@ -139,9 +133,14 @@ const SCORING = [
   // lost/unmoored | quietly content | heavy | restless/eager | hopeful/building
   [{ meaning: 3, identity: 2 }, { comfort: 2, meaning: 1 }, { catharsis: 3 }, { growth: 2, escapism: 2 }, { hope: 3, meaning: 1 }],
 
-  // Q2: When completely alone with your thoughts, what feeling shows up most?
-  // loneliness | clarity/quiet | anxiety/spiral | numbness | peace
-  [{ connection: 3 }, { meaning: 2, comfort: 1 }, { catharsis: 2, meaning: 1 }, { catharsis: 2, meaning: 2 }, { comfort: 2, connection: 1 }],
+  // Q2: How connected do you feel? (slider bins: alone→held)
+  [
+    { connection: 3, catharsis: 1 },   // 1–2: completely alone
+    { connection: 2, validation: 1 },  // 3–4: somewhat alone
+    { connection: 1 },                 // 5–6: middle
+    { comfort: 2 },                    // 7–8: mostly held
+    { comfort: 3, connection: 1 },     // 9–10: deeply held
+  ],
 
   // Q3: What's weighing on you most right now?
   // relationship | running out of time | something unsaid | choices | quiet heaviness
@@ -155,9 +154,13 @@ const SCORING = [
   // distant/barely recognise | wistful/miss simpler | proud/real growth | stuck | uncertain/uneasy
   [{ identity: 3, growth: 1 }, { catharsis: 2, comfort: 2 }, { growth: 3, meaning: 1 }, { growth: 2, catharsis: 2 }, { identity: 2, meaning: 1 }],
 
-  // Q6: What do you most wish you could do right now?
-  // cry | disappear | have someone with me | make sense | start fresh
-  [{ catharsis: 3 }, { escapism: 3 }, { connection: 3, validation: 1 }, { meaning: 3 }, { growth: 2, escapism: 2 }],
+  // Q6: This or That — pairs: [escape/understand, be seen/be alone, release/build]
+  // Format: [[left-score, right-score], ...]
+  [
+    [{ escapism: 2 }, { meaning: 2 }],                      // escape vs understand
+    [{ validation: 2, connection: 1 }, { meaning: 1, catharsis: 1 }], // be seen vs be alone
+    [{ catharsis: 3 }, { growth: 3 }],                      // release vs build
+  ],
 
   // Q7: What does your mind most feel like doing right now?
   // getting lost | making sense | feeling deeply | being surprised | resting in a story
@@ -167,9 +170,13 @@ const SCORING = [
   // grateful | distant | unseen | protective/hold back | curious
   [{ connection: 3, comfort: 1 }, { connection: 2, catharsis: 1 }, { validation: 3 }, { catharsis: 3, connection: 1 }, { connection: 2, growth: 1 }],
 
-  // Q9: When you imagine the next year, what comes up first?
-  // excitement | uncertainty | fear | hope | heaviness
-  [{ hope: 3, growth: 1 }, { meaning: 3 }, { catharsis: 2, meaning: 1 }, { hope: 3 }, { catharsis: 2, growth: 2 }],
+  // Q9: Spectrum — axes: lost/grounded, empty/overwhelmed, closed/open
+  // Format: [{low, mid, high}, ...] for each axis
+  [
+    { low: { identity: 2, meaning: 2 }, mid: { identity: 1 }, high: { comfort: 2, hope: 1 } },     // lost←→grounded
+    { low: { meaning: 2, catharsis: 1 }, mid: {}, high: { catharsis: 2, meaning: 1 } },             // empty←→overwhelmed
+    { low: { connection: 2, catharsis: 1 }, mid: { connection: 1 }, high: { growth: 2, hope: 1 } }, // closed←→open
+  ],
 
   // Q10: If you could receive one thing from the world right now?
   // truly seen | understand something | transported | release | connected
@@ -304,24 +311,86 @@ const SCORING_KIDS = [
 ];
 
 function computeNeedScores(answers, isKid = false) {
-  const scoring = isKid ? SCORING_KIDS : SCORING;
-  const scores = {
+  const qs      = isKid ? QUESTIONS_KIDS : QUESTIONS;
+  const scoring = isKid ? SCORING_KIDS   : SCORING;
+  const scores  = {
     catharsis: 0, meaning: 0, connection: 0, validation: 0,
     escapism: 0,  comfort: 0, hope: 0,       growth: 0, identity: 0,
   };
-  answers.forEach((answerIdx, qIdx) => {
-    const map = scoring[qIdx]?.[answerIdx] || {};
-    Object.entries(map).forEach(([need, val]) => { scores[need] += val; });
+
+  answers.forEach((answer, qIdx) => {
+    const q   = qs[qIdx];
+    const sc  = scoring[qIdx];
+    if (!q || !sc || answer === null || answer === undefined) return;
+
+    const type = q.type || 'multiple-choice';
+
+    if (type === 'multiple-choice') {
+      const map = sc[answer] || {};
+      Object.entries(map).forEach(([need, val]) => { scores[need] = (scores[need] || 0) + val; });
+
+    } else if (type === 'slider') {
+      const bin = sliderBin(answer);
+      const map = sc[bin] || {};
+      Object.entries(map).forEach(([need, val]) => { scores[need] = (scores[need] || 0) + val; });
+
+    } else if (type === 'this-or-that') {
+      // answer is [0|1, 0|1, 0|1] — one per pair
+      if (!Array.isArray(answer)) return;
+      answer.forEach((choice, pairIdx) => {
+        const map = sc[pairIdx]?.[choice] || {};
+        Object.entries(map).forEach(([need, val]) => { scores[need] = (scores[need] || 0) + val; });
+      });
+
+    } else if (type === 'spectrum') {
+      // answer is [0-100, 0-100, 0-100] — position on each axis
+      if (!Array.isArray(answer)) return;
+      answer.forEach((val, axisIdx) => {
+        const axisSc = sc[axisIdx];
+        if (!axisSc) return;
+        const zone = val < 33 ? 'low' : val < 67 ? 'mid' : 'high';
+        const map  = axisSc[zone] || {};
+        Object.entries(map).forEach(([need, v]) => { scores[need] = (scores[need] || 0) + v; });
+      });
+    }
   });
+
   return scores;
 }
 
 function buildAnswerSummary(answers, isKid = false) {
   const qs = isKid ? QUESTIONS_KIDS : QUESTIONS;
-  return answers.map((answerIdx, qIdx) => {
+  return answers.map((answer, qIdx) => {
     const q = qs[qIdx];
-    return `Q${qIdx + 1}: "${q.text}"\nAnswer: "${q.options[answerIdx]}"`;
-  }).join('\n\n');
+    if (!q || answer === null || answer === undefined) return null;
+
+    const type = q.type || 'multiple-choice';
+
+    if (type === 'multiple-choice') {
+      return `Q${qIdx + 1}: "${q.text}"\nAnswer: "${q.options[answer]}"`;
+
+    } else if (type === 'slider') {
+      const pct    = Math.round(((answer - q.min) / (q.max - q.min)) * 100);
+      const closer = pct < 50 ? q.poles[0] : q.poles[1];
+      return `Q${qIdx + 1}: "${q.text}"\nAnswer: ${answer}/10 — closer to "${closer}"`;
+
+    } else if (type === 'this-or-that') {
+      if (!Array.isArray(answer)) return null;
+      const choices = answer.map((choice, i) => q.pairs[i][choice]).join(', ');
+      return `Q${qIdx + 1}: "${q.text}"\nAnswer: chose "${choices}"`;
+
+    } else if (type === 'spectrum') {
+      if (!Array.isArray(answer)) return null;
+      const parts = answer.map((val, i) => {
+        const axis   = q.axes[i];
+        const closer = val < 50 ? axis.poles[0] : axis.poles[1];
+        return `${axis.poles[0]}↔${axis.poles[1]}: ${val}% (closer to "${closer}")`;
+      }).join('; ');
+      return `Q${qIdx + 1}: "${q.text}"\nAnswer: ${parts}`;
+    }
+
+    return null;
+  }).filter(Boolean).join('\n\n');
 }
 
 // ── Safe JSON parser with markdown-fence stripping ────────────────────────────
@@ -383,6 +452,15 @@ function randPages(count, min, max) {
 
 // Shuffle an array in place and return it
 function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+// Converts a 1-10 slider value into one of 5 scoring bins (0–4).
+function sliderBin(value) {
+  if (value <= 2) return 0;
+  if (value <= 4) return 1;
+  if (value <= 6) return 2;
+  if (value <= 8) return 3;
+  return 4;
+}
 
 // Genre 10751 = Family, 16 = Animation
 // When kidMode=true every pool restricts to family/animation content
@@ -981,7 +1059,14 @@ app.get('/api/questions', (req, res) => {
   const age = parseInt(req.query.age, 10);
   const isKid = !isNaN(age) && age < 12;
   const qs = isKid ? QUESTIONS_KIDS : QUESTIONS;
-  res.json(qs.map(q => ({ text: q.text, options: q.options })));
+  res.json(qs.map(q => {
+    const type = q.type || 'multiple-choice';
+    if (type === 'multiple-choice') return { type, text: q.text, options: q.options };
+    if (type === 'slider')        return { type, text: q.text, poles: q.poles, min: q.min, max: q.max, default: q.default };
+    if (type === 'this-or-that')  return { type, text: q.text, pairs: q.pairs };
+    if (type === 'spectrum')      return { type, text: q.text, axes: q.axes };
+    return { type, text: q.text };
+  }));
 });
 
 // Shuffle: re-fetches TMDB pools and re-ranks using the existing psychological profile.
