@@ -485,6 +485,10 @@ function loadImage(src) {
 }
 
 async function generateResultsImage({ recommendations }) {
+  // Wait for web fonts to be fully loaded — without this, canvas falls back to system
+  // fonts whose metrics differ, causing measureText to wrap at wrong points → overlap.
+  if (document.fonts?.ready) await document.fonts.ready;
+
   // Sort by fit percentage descending so the poster reflects the ranked order
   const recs = [...recommendations].sort((a, b) => b.fit_percentage - a.fit_percentage);
 
@@ -493,7 +497,7 @@ async function generateResultsImage({ recommendations }) {
   const PAD       = 44;
   const POSTER_W  = 90;
   const POSTER_H  = 150;
-  const CARD_H    = 165;
+  const CARD_H    = 180;   // was 165 — extra height prevents text overflow
   const GAP       = 12;
   const CARD_PAD  = 14;
   const cardsTop  = 186;
@@ -566,43 +570,45 @@ async function generateResultsImage({ recommendations }) {
     let ty = y + 22;
 
     // Category label + percentage (same line)
+    // NOTE: only DM Sans weights 300/400/500 are loaded — using 600/700 causes
+    // canvas to fall back to a different system font with different metrics → text overlap.
     ctx.fillStyle = cat.color || '#ffffff';
-    ctx.font = `600 10px 'DM Sans', sans-serif`;
+    ctx.font = `500 10px 'DM Sans', sans-serif`;
     ctx.fillText((cat.label || rec.category).toUpperCase(), tx, ty);
     const pctText = `${rec.fit_percentage}%`;
-    ctx.font = `700 12px 'DM Sans', sans-serif`;
+    ctx.font = `500 12px 'DM Sans', sans-serif`;
     const pctW = ctx.measureText(pctText).width;
     ctx.fillStyle = cat.color || '#ffffff';
     ctx.fillText(pctText, tx + tw - pctW, ty);
-    ty += 22;
+    ty += 24;
 
     // Title (up to 2 lines)
     ctx.fillStyle = '#eef6fc';
     ctx.font = `700 15px 'Playfair Display', serif`;
-    ty = wrapText(ctx, `${rec.title} (${rec.year})`, tx, ty, tw, 19, 2);
-    ty += 10;
+    ty = wrapText(ctx, `${rec.title} (${rec.year})`, tx, ty, tw, 20, 2);
+    ty += 20;  // advance past the drawn baseline + comfortable gap
 
     // Director (only if space remains)
-    if (ty + 14 <= y + CARD_H - 34) {
+    if (ty + 14 <= y + CARD_H - 44) {
       ctx.fillStyle = '#5a7a95';
       ctx.font = `300 11px 'DM Sans', sans-serif`;
       ctx.fillText(`dir. ${rec.director || ''}`, tx, ty);
-      ty += 17;
+      ty += 20;
     }
 
     // Synopsis (max 2 lines, only if space)
-    if (ty + 15 <= y + CARD_H - 18) {
+    if (ty + 15 <= y + CARD_H - 26) {
       ctx.fillStyle = '#8aa8be';
       ctx.font = `300 10.5px 'DM Sans', sans-serif`;
-      ty = wrapText(ctx, rec.synopsis || '', tx, ty, tw, 15, 2);
-      ty += 8;
+      ty = wrapText(ctx, rec.synopsis || '', tx, ty, tw, 16, 2);
+      ty += 14;
     }
 
     // Why line (max 1 line, only if space)
-    if (ty + 13 <= y + CARD_H - 2) {
+    if (ty + 13 <= y + CARD_H - 6) {
       ctx.fillStyle = '#4a7060';
-      ctx.font = `italic 10.5px 'DM Sans', sans-serif`;
-      wrapText(ctx, rec.why_this_film || '', tx, ty, tw, 13, 1);
+      ctx.font = `300 italic 10.5px 'DM Sans', sans-serif`;
+      wrapText(ctx, rec.why_this_film || '', tx, ty, tw, 14, 1);
     }
   }
 
@@ -738,7 +744,7 @@ async function submitQuiz() {
     const res = await fetch('/api/quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, age: userAge }),
+      body: JSON.stringify({ answers, age: userAge, seenFilmIds: getSeenFilmIds() }),
       signal: controller.signal,
     });
 
@@ -780,9 +786,37 @@ function showToast(message) {
   setTimeout(() => errorBox.remove(), 6000);
 }
 
+// ── Seen film tracking ─────────────────────────────────────────────────────────
+// Keeps a rolling list of TMDB IDs the user has been recommended so the server
+// can filter them from pools — prevents Cinema Paradiso (and others) from
+// appearing every single time because they dominate page-1 of their language pool.
+const SEEN_FILMS_KEY   = 'seenFilmIds';
+const SEEN_FILMS_MAX   = 60;  // ~10 full quiz sessions worth
+
+function getSeenFilmIds() {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_FILMS_KEY) || '[]');
+  } catch (_) { return []; }
+}
+
+function addSeenFilmIds(ids) {
+  try {
+    const existing = getSeenFilmIds();
+    const merged   = [...new Set([...existing, ...ids])];
+    // Keep only the most recent SEEN_FILMS_MAX so the list doesn't grow forever
+    const trimmed  = merged.slice(-SEEN_FILMS_MAX);
+    localStorage.setItem(SEEN_FILMS_KEY, JSON.stringify(trimmed));
+  } catch (_) { /* storage unavailable */ }
+}
+
 // ── Render Results ────────────────────────────────────────────────────────────
 function renderResults({ profile, recommendations }, { swapOnly = false } = {}) {
   lastResults = { profile, recommendations };
+
+  // Record the films we just showed so they won't repeat next time
+  if (!swapOnly && recommendations?.length) {
+    addSeenFilmIds(recommendations.map(r => r.tmdb_id).filter(Boolean));
+  }
 
   // Save to localStorage for session restore
   try {

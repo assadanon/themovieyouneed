@@ -880,10 +880,11 @@ app.post('/api/quiz', async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Please wait a minute before trying again.' });
     }
 
-    const { answers, age } = req.body;
+    const { answers, age, seenFilmIds } = req.body;
     if (!Array.isArray(answers) || answers.length !== 10) {
       return res.status(400).json({ error: 'Expected 10 quiz answers.' });
     }
+    const seenSet = new Set(Array.isArray(seenFilmIds) ? seenFilmIds : []);
 
     // Kid mode: age under 12 → age-appropriate content everywhere
     const kidMode = typeof age === 'number' && age < 12;
@@ -924,13 +925,23 @@ app.post('/api/quiz', async (req, res) => {
     });
     console.log(`Profile pool: ${profilePool.length} films from queries: ${(profile.search_queries || []).join(', ')}`);
 
+    // Filter out films the user has already been recommended in previous sessions
+    // so the same film (e.g. Cinema Paradiso) doesn't appear every single time.
+    // We only filter when the pool still has enough films after exclusion (≥ 8);
+    // otherwise we keep the film so we always have meaningful candidates.
+    function filterSeen(pool) {
+      if (!seenSet.size) return pool;
+      const filtered = pool.filter(m => !seenSet.has(m.id));
+      return filtered.length >= 8 ? filtered : pool;
+    }
+
     const pools = blendProfilePool({
-      popular:      popularPool,
-      indie:        indiePool,
-      animation:    animationPool,
-      classic:      classicPool,
-      world_cinema: worldPool,
-      short:        shortPool,
+      popular:      filterSeen(popularPool),
+      indie:        filterSeen(indiePool),
+      animation:    filterSeen(animationPool),
+      classic:      filterSeen(classicPool),
+      world_cinema: filterSeen(worldPool),
+      short:        filterSeen(shortPool),
     }, profilePool);
 
     const totalCandidates = Object.values(pools).reduce((s, p) => s + p.length, 0);
