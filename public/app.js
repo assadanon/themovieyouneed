@@ -744,7 +744,7 @@ async function submitQuiz() {
     const res = await fetch('/api/quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, age: userAge, seenFilmIds: getSeenFilmIds() }),
+      body: JSON.stringify({ answers, age: userAge }),
       signal: controller.signal,
     });
 
@@ -786,37 +786,9 @@ function showToast(message) {
   setTimeout(() => errorBox.remove(), 6000);
 }
 
-// ── Seen film tracking ─────────────────────────────────────────────────────────
-// Keeps a rolling list of TMDB IDs the user has been recommended so the server
-// can filter them from pools — prevents Cinema Paradiso (and others) from
-// appearing every single time because they dominate page-1 of their language pool.
-const SEEN_FILMS_KEY   = 'seenFilmIds';
-const SEEN_FILMS_MAX   = 60;  // ~10 full quiz sessions worth
-
-function getSeenFilmIds() {
-  try {
-    return JSON.parse(localStorage.getItem(SEEN_FILMS_KEY) || '[]');
-  } catch (_) { return []; }
-}
-
-function addSeenFilmIds(ids) {
-  try {
-    const existing = getSeenFilmIds();
-    const merged   = [...new Set([...existing, ...ids])];
-    // Keep only the most recent SEEN_FILMS_MAX so the list doesn't grow forever
-    const trimmed  = merged.slice(-SEEN_FILMS_MAX);
-    localStorage.setItem(SEEN_FILMS_KEY, JSON.stringify(trimmed));
-  } catch (_) { /* storage unavailable */ }
-}
-
 // ── Render Results ────────────────────────────────────────────────────────────
 function renderResults({ profile, recommendations }, { swapOnly = false } = {}) {
   lastResults = { profile, recommendations };
-
-  // Record the films we just showed so they won't repeat next time
-  if (!swapOnly && recommendations?.length) {
-    addSeenFilmIds(recommendations.map(r => r.tmdb_id).filter(Boolean));
-  }
 
   // Save to localStorage for session restore
   try {

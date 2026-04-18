@@ -659,42 +659,33 @@ async function fetchWorldCinemaPool(kidMode = false, random = false) {
   if (kidMode) {
     const langs = ['ja', 'fr', 'it', 'de', 'es', 'zh', 'ko', 'sv'];
     const results = await Promise.all(langs.map(lang => {
-      const page = random ? Math.floor(Math.random() * 8) + 1 : 1;
-      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${extra}${noAnim}&page=${page}`)
+      const page = Math.floor(Math.random() * 5) + 1;
+      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=20&vote_average.gte=7.0&with_original_language=${lang}${extra}${noAnim}&page=${page}`)
         .then(d => filterMovies(d.results).slice(0, 4)).catch(() => []);
     }));
     return shuffle(results.flat());
   }
 
-  if (!random) {
-    // Deterministic: always use these 8 languages, page 1, slice 3 each → 24 candidates
-    const langs = ['fr', 'it', 'de', 'ja', 'ko', 'zh', 'es', 'pt'];
-    const results = await Promise.all(
-      langs.map(lang =>
-        tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=1`)
-          .then(d => filterMovies(d.results).slice(0, 3)).catch(() => [])
-      )
-    );
-    return shuffle(results.flat()).slice(0, 20);
-  }
+  // Extended language list:
+  // Europe: French, Italian, German, Spanish, Portuguese, Russian
+  // Asia:   Japanese, Korean, Mandarin, Hindi, Persian (Iran), Turkish
+  // Africa: Arabic (Egypt-dominant), Yoruba (Nollywood), Amharic (Ethiopia)
+  // Oceania: Māori (New Zealand)
+  // Latin:  already covered by es/pt above
+  const langs = ['fr', 'it', 'de', 'es', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'fa', 'tr', 'ar', 'yo', 'am', 'mi'];
 
-  // Random: balanced language groups, random pages
-  const european  = ['fr', 'it', 'de', 'sv', 'da', 'nl', 'pl', 'ro', 'cs', 'hu', 'ru'];
-  const asian     = ['ja', 'ko', 'zh', 'hi', 'fa', 'tr'];
-  const latinMid  = ['es', 'pt', 'ar'];
-  const selected  = [
-    ...shuffle([...european]).slice(0, 4),
-    ...shuffle([...asian]).slice(0, 3),
-    ...shuffle([...latinMid]).slice(0, 1),
-  ];
+  // Each language gets a random page from 1–5 (all high-quality by vote_average.desc)
+  // so the same film never dominates the pool quiz after quiz.
+  // Filter by rating only — vote_count.gte=20 just prevents 1-vote noise.
+  const pageRange = random ? 8 : 5;
   const results = await Promise.all(
-    selected.map(lang => {
-      const page = Math.floor(Math.random() * 6) + 1;
-      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=80&vote_count.lte=25000&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=${page}`)
-        .then(d => filterMovies(d.results).slice(0, 3)).catch(() => []);
+    langs.map(lang => {
+      const page = Math.floor(Math.random() * pageRange) + 1;
+      return tmdbFetch(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=20&vote_average.gte=7.0&with_original_language=${lang}${noAnim}&page=${page}`)
+        .then(d => filterMovies(d.results).slice(0, 2)).catch(() => []);
     })
   );
-  return shuffle(results.flat());
+  return shuffle(results.flat()).slice(0, 24);
 }
 
 // Fetch films matching the user's psychological themes via TMDB keyword search.
@@ -880,11 +871,10 @@ app.post('/api/quiz', async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Please wait a minute before trying again.' });
     }
 
-    const { answers, age, seenFilmIds } = req.body;
+    const { answers, age } = req.body;
     if (!Array.isArray(answers) || answers.length !== 10) {
       return res.status(400).json({ error: 'Expected 10 quiz answers.' });
     }
-    const seenSet = new Set(Array.isArray(seenFilmIds) ? seenFilmIds : []);
 
     // Kid mode: age under 12 → age-appropriate content everywhere
     const kidMode = typeof age === 'number' && age < 12;
@@ -925,23 +915,13 @@ app.post('/api/quiz', async (req, res) => {
     });
     console.log(`Profile pool: ${profilePool.length} films from queries: ${(profile.search_queries || []).join(', ')}`);
 
-    // Filter out films the user has already been recommended in previous sessions
-    // so the same film (e.g. Cinema Paradiso) doesn't appear every single time.
-    // We only filter when the pool still has enough films after exclusion (≥ 8);
-    // otherwise we keep the film so we always have meaningful candidates.
-    function filterSeen(pool) {
-      if (!seenSet.size) return pool;
-      const filtered = pool.filter(m => !seenSet.has(m.id));
-      return filtered.length >= 8 ? filtered : pool;
-    }
-
     const pools = blendProfilePool({
-      popular:      filterSeen(popularPool),
-      indie:        filterSeen(indiePool),
-      animation:    filterSeen(animationPool),
-      classic:      filterSeen(classicPool),
-      world_cinema: filterSeen(worldPool),
-      short:        filterSeen(shortPool),
+      popular:      popularPool,
+      indie:        indiePool,
+      animation:    animationPool,
+      classic:      classicPool,
+      world_cinema: worldPool,
+      short:        shortPool,
     }, profilePool);
 
     const totalCandidates = Object.values(pools).reduce((s, p) => s + p.length, 0);
