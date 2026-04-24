@@ -672,7 +672,7 @@ async function fetchWorldCinemaPool(kidMode = false, random = false) {
   // MENA:    Arabic — covers Egypt, Lebanon, Palestine (Omar, Paradise Now, etc.)
   // Africa:  Yoruba (Nollywood), Amharic (Ethiopia)
   // Oceania: Māori (New Zealand)
-  const langs = ['fr', 'it', 'de', 'es', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'fa', 'tr', 'he', 'ar', 'yo', 'am', 'mi'];
+  const langs = ['fr', 'it', 'de', 'es', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'fa', 'tr', 'he', 'ar', 'yo', 'am', 'mi', 'da'];
 
   // Each language gets a random page from 1–5 so the same film never dominates.
   // No per-language slice — small catalogues (e.g. Hebrew: 11 films total) contribute

@@ -1037,6 +1037,44 @@ function renderResults({ profile, recommendations }, { swapOnly = false } = {}) 
       expandedPanel.style.willChange = '';
       panelBusy = false;
     }, 1850);
+
+    // Trigger resonance bar fill + counter + glow after all animations have settled
+    setTimeout(() => {
+      const fill  = expandedPanel.querySelector('.ep-res-fill');
+      const pctEl = expandedPanel.querySelector('.ep-res-pct');
+      if (!fill) return;
+
+      const target   = parseInt(fill.dataset.pct, 10);
+      const DURATION = 2000;
+
+      // Same easing as the CSS bar: cubic-bezier(0.65, 0, 0.35, 1)
+      function easedProgress(t) {
+        return t < 0.5
+          ? 4 * t * t * t
+          : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+
+      // Start bar fill + glow
+      fill.style.transition = 'width 2s cubic-bezier(0.65, 0, 0.35, 1), box-shadow 0.5s ease';
+      fill.style.width      = target + '%';
+      fill.style.boxShadow  = '0 0 7px 2px var(--cat-color)';
+
+      // Drive the counter with rAF using the same easing
+      const startTime = performance.now();
+      function tick(now) {
+        const progress = Math.min((now - startTime) / DURATION, 1);
+        const value    = Math.round(easedProgress(progress) * target);
+        if (pctEl) pctEl.textContent = `${value}% resonance`;
+        if (progress < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      // Fade glow out once the fill reaches its target
+      setTimeout(() => {
+        fill.style.transition = 'width 2s cubic-bezier(0.65, 0, 0.35, 1), box-shadow 1.8s ease';
+        fill.style.boxShadow  = 'none';
+      }, DURATION);
+    }, 2150);
   }
 
   function closePanel(onDone) {
@@ -1136,9 +1174,14 @@ function buildExpandedHTML(rec) {
           <div class="ep-meta">
             ${countriesText ? `<span class="ep-country">${escapeHtml(countriesText)}</span>` : ''}
             ${runtimeText   ? `<span class="ep-runtime">⏱ ${runtimeText}</span>` : ''}
-            <span class="ep-fit">${rec.fit_percentage}% resonance</span>
             ${rec.tmdb_id   ? `<button class="ep-trailer-btn" data-movie-id="${rec.tmdb_id}">watch trailer</button>` : ''}
             ${rec.tmdb_id   ? `<a class="ep-tmdb-link" href="${tmdbUrl}" target="_blank" rel="noopener">show more →</a>` : ''}
+          </div>
+          <div class="ep-resonance">
+            <div class="ep-res-track">
+              <div class="ep-res-fill" data-pct="${rec.fit_percentage}"></div>
+            </div>
+            <span class="ep-res-pct">0% resonance</span>
           </div>
         </div>
       </div>
